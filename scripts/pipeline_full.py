@@ -27,7 +27,12 @@ def main():
         already_ready = 0
         for clip_id in result["clip_ids"]:
             try:
-                clip = db.session.get(Clip, clip_id)
+                try:
+                    clip = db.session.get(Clip, clip_id)
+                except Exception:
+                    # Reset a failed SQLAlchemy transaction before the next clip.
+                    db.session.rollback()
+                    raise
                 if clip is None:
                     failed += 1
                     print("Clip", clip_id, "failed: not found")

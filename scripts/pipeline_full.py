@@ -25,6 +25,10 @@ def main():
         already_ready = 0
         for clip_id in result["clip_ids"]:
             clip = db.session.get(Clip, clip_id)
+            if clip is None:
+                failed += 1
+                print("Clip", clip_id, "failed: not found")
+                continue
             if clip.editorial_status == "ready":
                 already_ready += 1
                 print("Already rendered:", clip_id)

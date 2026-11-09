@@ -49,3 +49,8 @@ The published video must still be editorially reviewed.
 - `AI_ENABLED` enables a Celery task endpoint but does not grant Kick, YouTube, TikTok or Instagram permissions.
 - `PROCESSING_ENABLED` only queues FFmpeg work; it **does not** enable social media uploads.
 - The repository has no production-ready database migration mechanism yet. The initial `create_all` is a development aid.
+
+## Calendario privado
+Abre /publications, selecciona un clip terminado, una red y la fecha/hora local de Nueva York. El programa crea solo un borrador en la tabla publications; no envía archivos a plataformas externas. Puedes cancelar planes pendientes. Comprueba que cada red tiene un máximo de 5 borradores activos al día y un intervalo mínimo de 120 minutos entre ellos.
+
+En PostgreSQL, un bloqueo de asesoramiento por plataforma protege el calendario ante dos solicitudes concurrentes. El modo SQLite para pruebas no ofrece la misma garantía de concurrencia.

@@ -16,7 +16,7 @@ Automatización de edición de videos cortos **con material propio o autorizado*
 - Análisis opcional con faster-whisper (transcripción local)
 - Selector preliminar de fragmentos a partir de transcripciones; **es heurístico, no predictor de viralidad**
 - Generación de subtítulos SRT como archivo adjunto y comando opcional para incrustarlos en video
-- Límite de planificación: al menos 120 minutos entre publicaciones y máximo 5 por red/día
+- Calendario privado de borradores con cancelación, límites de 120 minutos y máximo 5 por red/día; sin uploads reales
 - Registro manual de métricas de clips publicados desde tus propias cuentas, con cálculo de interacción
 - Pruebas automatizadas con GitHub Actions
 
@@ -59,7 +59,7 @@ La transcripción puede consumir memoria/CPU considerable, y la primera ejecuci�
 
 ## Reglas comerciales y derechos
 
-El proyecto busca construir canales propios de Shorts, Reels y TikTok, no ofrecer un servicio a terceros. La publicación y monetización dependen de permisos de reutilización, contenido original y normas vigentes de cada plataforma. Declarar derechos en un formulario **no constituye una verificación legal independiente**.
+Los borradores del calendario no provocan publicaciones en redes. El proyecto busca construir canales propios de Shorts, Reels y TikTok, no ofrecer un servicio a terceros. La publicación y monetización dependen de permisos de reutilización, contenido original y normas vigentes de cada plataforma. Declarar derechos en un formulario **no constituye una verificación legal independiente**.
 
 ## Seguridad
 

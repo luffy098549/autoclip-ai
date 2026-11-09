@@ -1,0 +1,1 @@
+.plan-row{align-items:center}.plan-row .button{padding:7px 13px;border:0;cursor:pointer}.plan-row small{display:block}.editor-form [type="datetime-local"]{color-scheme:dark}.plan-row>span{border:1px solid var(--border);border-radius:20px;padding:5px 11px}@media(max-width:700px){.plan-row{flex-direction:row;flex-wrap:wrap}.plan-row .button{margin-left:auto}}

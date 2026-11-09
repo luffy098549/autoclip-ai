@@ -1,7 +1,29 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="panel"><div class="section-heading"><h2>Calendario de publicaciones</h2><span class="tag">Horario objetivo</span></div><p class="muted">Zona horaria: America/New_York. No hay publicaciones automáticas activas.</p>
-<div class="slots"><span>10:00</span><span>12:00</span><span>14:00</span><span>16:00</span><span>18:00</span></div><p class="smallprint">Son horarios propuestos, no tareas programadas. El planificador aplica un intervalo mínimo de 120 minutos y un máximo de cinco publicaciones por plataforma al día.</p>
-<div class="empty"><span class="empty-icon">◷</span><h3>Publicaciones desactivadas</h3><p>Se habilitarán después de OAuth, controles de derechos y pruebas de APIs oficiales.</p></div>
+<section class="panel">
+  <div class="section-heading"><h2>Calendario de publicaciones</h2><span class="tag">Borradores privados</span></div>
+  <p class="muted">Organiza clips terminados para YouTube Shorts, TikTok e Instagram Reels. Ningún borrador se enviará a las redes mientras las integraciones estén desactivadas.</p>
+  <div class="slots" aria-label="Horarios de ejemplo">
+    <span>10:00</span><span>12:00</span><span>14:00</span><span>16:00</span><span>18:00</span>
+  </div>
+  <p class="smallprint">Ejemplos, no publicaciones confirmadas. Zona horaria: America/New_York. Mínimo 120 minutos y máximo cinco planes al día por plataforma.</p>
 </section>
+{% if session.get('admin_authenticated') %}
+<section class="panel">
+  <div class="section-heading"><h2>Organizar un nuevo clip</h2><span class="tag">Solo propietario</span></div>
+  <form id="plan-form" class="editor-form">
+    <label>Clip listo<select id="plan-clip" name="clip_id" required><option value="">Cargando biblioteca…</option></select></label>
+    <label>Red social<select name="platform" required><option value="youtube">YouTube Shorts</option><option value="tiktok">TikTok</option><option value="instagram">Instagram Reels</option></select></label>
+    <label>Fecha y hora en Nueva York<input id="plan-time" type="datetime-local" name="scheduled_local" required></label>
+    <button class="button" type="submit">Guardar borrador</button>
+  </form>
+  <p id="plan-feedback" class="form-feedback" aria-live="polite"></p>
+</section>
+<section class="panel">
+  <div class="section-heading"><h2>Mi calendario</h2><button id="plans-refresh" type="button" class="button ghost">Actualizar</button></div>
+  <div id="plan-list" class="data-list" aria-live="polite"><p class="muted">Consultando…</p></div>
+</section>
+{% else %}
+<section class="panel"><h2>Planificación privada</h2><p class="muted">Inicia sesión como administrador para organizar los clips.</p><a href="{{ url_for('auth.login') }}" class="button">Acceder</a></section>
+{% endif %}
 {% endblock %}

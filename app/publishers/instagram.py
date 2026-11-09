@@ -1,110 +1,105 @@
-"""Official Instagram Graph API Reels publishing adapter.
+"""Official Instagram Reels container lifecycle.
 
-Requires an Instagram Professional account, Meta app, authorized token and
-a public HTTPS video URL hosted on an owner-controlled domain.
-Never invoked by the automatic scheduler.
+Requires a Professional Instagram account, OAuth authorization, and a publicly
+reachable HTTPS video URL. No scheduled uploads are enabled.
 """
+import ipaddress
+import re
 from urllib.parse import urlsplit
-import time
+from .base import PublishingDisabled
 
 
-class InstagramPublishError(RuntimeError):
-    pass
-
-
-def validate_owned_video_url(video_url, permitted_host):
-    parts = urlsplit(str(video_url))
+def validate_public_media_url(url):
+    parts = urlsplit(str(url))
     host = (parts.hostname or "").lower()
-    allowed = str(permitted_host or "").lower().strip()
-    if (parts.scheme != "https" or not allowed or host != allowed
-            or parts.username or parts.password or not parts.path):
-        raise ValueError("An HTTPS video on your configured media host is required")
-    return video_url
+    if parts.scheme != "https" or not host or parts.username or parts.password:
+        raise ValueError("Video must use a public HTTPS URL")
+    if host == "localhost" or host.endswith((".localhost", ".local", ".internal")):
+        raise ValueError("Private video hosts are not allowed")
+    try:
+        ipaddress.ip_address(host)
+        raise ValueError("Use a verified public domain, not an IP address")
+    except ValueError as exc:
+        if "not an IP address" in str(exc):
+            raise
+    if "." not in host:
+        raise ValueError("A public hostname is required")
+    if parts.fragment:
+        raise ValueError("Video URL must not include a fragment")
+    return str(url)
 
 
-def _post(session, url, token, data):
-    response = session.post(
-        url, data=data, headers={"Authorization": "Bearer " + token}, timeout=30
+def _endpoint(identifier, action="", version="v25.0"):
+    if not str(identifier).isdigit() or not re.fullmatch(r"v\d+\.\d+", version):
+        raise ValueError("Invalid Instagram identifier or API version")
+    return f"https://graph.facebook.com/{version}/{identifier}" + (f"/{action}" if action else "")
+
+
+def _session(session):
+    if session is not None:
+        return session
+    try:
+        import requests
+    except ImportError as exc:
+        raise PublishingDisabled("Install requirements-social.txt") from exc
+    return requests
+
+
+def create_reel_container(ig_user_id, video_url, caption, access_token, *,
+                          approved=False, session=None, version="v25.0"):
+    """Start an upload container; does not publish the reel."""
+    if not approved:
+        raise PublishingDisabled("Explicit owner approval required")
+    if not access_token:
+        raise PublishingDisabled("Instagram OAuth token required")
+    url = validate_public_media_url(video_url)
+    response = _session(session).post(
+        _endpoint(ig_user_id, "media", version), timeout=30,
+        headers={"Authorization": f"Bearer {access_token}"},
+        data={"media_type":"REELS","video_url":url,
+              "caption":str(caption)[:2200],"share_to_feed":"false"},
     )
-    if response.status_code >= 400:
-        raise InstagramPublishError("Meta API returned HTTP " + str(response.status_code))
-    result = response.json()
-    if result.get("error"):
-        raise InstagramPublishError("Meta API rejected the publishing request")
-    return result
+    response.raise_for_status()
+    data = response.json()
+    if not data.get("id"):
+        raise RuntimeError("Instagram did not return a media container ID")
+    return str(data["id"])
 
 
-def create_reel_container(
-    video_url, caption, *, instagram_user_id, access_token,
-    allowed_media_host, session, version="v25.0"
-):
-    validate_owned_video_url(video_url, allowed_media_host)
-    if not str(instagram_user_id).isdigit() or not access_token:
-        raise ValueError("Instagram Professional account and OAuth token required")
-    result = _post(session,
-        f"https://graph.facebook.com/{version}/{instagram_user_id}/media",
-        access_token,
-        {"media_type": "REELS", "video_url": video_url, "caption": str(caption)[:2200]}
-    )
-    container_id = result.get("id")
-    if not container_id:
-        raise InstagramPublishError("Meta API did not return a creation ID")
-    return container_id
-
-
-def reel_status(container_id, *, access_token, session, version="v25.0"):
-    response = session.get(
-        f"https://graph.facebook.com/{version}/{container_id}",
+def get_reel_status(container_id, access_token, *, session=None, version="v25.0"):
+    if not access_token:
+        raise PublishingDisabled("Instagram OAuth token required")
+    response = _session(session).get(
+        _endpoint(container_id, version=version), timeout=30,
+        headers={"Authorization": f"Bearer {access_token}"},
         params={"fields": "status_code"},
-        headers={"Authorization": "Bearer " + access_token}, timeout=30
     )
-    if response.status_code >= 400:
-        raise InstagramPublishError("Meta container status HTTP " + str(response.status_code))
+    response.raise_for_status()
     return response.json().get("status_code", "UNKNOWN")
 
 
-def publish_reel_container(
-    container_id, *, instagram_user_id, access_token, session, version="v25.0"
-):
-    if not str(container_id).isdigit() or not str(instagram_user_id).isdigit():
-        raise ValueError("A valid container and professional account are required")
-    result = _post(session,
-        f"https://graph.facebook.com/{version}/{instagram_user_id}/media_publish",
-        access_token, {"creation_id": container_id}
+def publish_reel(ig_user_id, container_id, access_token, *,
+                 approved=False, session=None, version="v25.0"):
+    """Publish only with fresh explicit approval and a FINISHED media container."""
+    if not approved:
+        raise PublishingDisabled("Explicit owner approval required for publishing")
+    if not access_token:
+        raise PublishingDisabled("Instagram OAuth token required")
+    if get_reel_status(container_id, access_token, session=session,
+                       version=version) != "FINISHED":
+        raise RuntimeError("Reel container is not ready to publish")
+    response = _session(session).post(
+        _endpoint(ig_user_id, "media_publish", version), timeout=30,
+        headers={"Authorization": f"Bearer {access_token}"},
+        data={"creation_id": str(container_id)},
     )
-    if not result.get("id"):
-        raise InstagramPublishError("Meta API did not confirm a media ID")
-    return result["id"]
+    response.raise_for_status()
+    data = response.json()
+    if not data.get("id"):
+        raise RuntimeError("Instagram did not confirm a media ID")
+    return str(data["id"])
 
 
-def upload_reel(
-    video_url, caption, *, instagram_user_id, access_token,
-    allowed_media_host, confirmed_by_owner=False, session=None, version="v25.0"
-):
-    if not confirmed_by_owner:
-        raise PermissionError("Owner must explicitly approve the Reels publication")
-    if session is None:
-        try:
-            import requests
-        except ImportError as exc:
-            raise InstagramPublishError("Install requirements-social.txt") from exc
-        session = requests
-    container = create_reel_container(
-        video_url, caption, instagram_user_id=instagram_user_id,
-        access_token=access_token, allowed_media_host=allowed_media_host,
-        session=session, version=version
-    )
-    for _ in range(20):
-        status = reel_status(container, access_token=access_token,
-                             session=session, version=version)
-        if status == "FINISHED":
-            return publish_reel_container(
-                container, instagram_user_id=instagram_user_id,
-                access_token=access_token, session=session, version=version
-            )
-        if status in ("ERROR", "EXPIRED"):
-            raise InstagramPublishError("Meta rejected or expired the Reels container")
-        time.sleep(5)
-    raise InstagramPublishError(
-        "Container has not finished processing. Check its status before retrying."
-    )
+def upload_reel(*args, **kwargs):
+    """Prevent accidental old-call automatic uploads; use two-stage approval."""
+    raise PublishingDisabled("Use create_reel_container and publish_reel with approval")

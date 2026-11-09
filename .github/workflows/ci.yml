@@ -66,5 +66,7 @@ jobs:
         run: python -m scripts.init_db
       - name: Verify PostgreSQL migrations are idempotent
         run: python -m scripts.init_db
+      - name: Detect model and migration schema drift
+        run: python -m flask --app 'app:create_app' db check
       - name: Validate PostgreSQL schema and transaction rollback
         run: python -m pytest -q tests/test_postgres_db.py

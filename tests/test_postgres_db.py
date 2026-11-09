@@ -222,3 +222,38 @@ def test_postgres_allows_same_channel_identifier_on_different_platforms():
             text("SELECT count(*) FROM streamers WHERE channel_identifier = :channel"),
             {"channel": channel},
         ).scalar_one() == 0
+
+
+def test_postgres_rejects_duplicate_competitor_video_per_streamer():
+    """Metadata imports cannot create duplicate video rows for one streamer."""
+    from uuid import uuid4
+    from sqlalchemy.exc import IntegrityError
+    from app.models import CompetitorVideo
+
+    app = create_app({"TESTING": True})
+    with app.app_context():
+        channel = f"ci-competitor-{uuid4().hex}"
+        try:
+            streamer = Streamer(
+                display_name="Synthetic CI streamer", platform="youtube",
+                channel_identifier=channel, active=False,
+            )
+            db.session.add(streamer)
+            db.session.flush()
+            for _ in range(2):
+                db.session.add(CompetitorVideo(
+                    streamer_id=streamer.id, video_id="synthetic-video-id",
+                    title="Synthetic metadata only", view_count=0,
+                ))
+                if _ == 0:
+                    db.session.flush()
+            with pytest.raises(IntegrityError):
+                db.session.flush()
+        finally:
+            db.session.rollback()
+
+        assert db.session.execute(
+            text("SELECT count(*) FROM streamers WHERE channel_identifier = :channel"),
+            {"channel": channel},
+        ).scalar_one() == 0
+        assert db.session.execute(text("SELECT 1")).scalar_one() == 1

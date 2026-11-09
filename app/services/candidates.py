@@ -1,0 +1,33 @@
+"""Deterministic candidate selection scaffolding; not an AI prediction."""
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class Candidate:
+    start: float
+    end: float
+    score: float
+    reason: str = ""
+
+
+def select_candidates(candidates: list[Candidate], *, threshold: float = 75.0,
+                      max_count: int = 5, max_overlap_ratio: float = 0.25) -> list[Candidate]:
+    """Select non-duplicated, valid candidate time ranges sorted by score."""
+    selected = []
+    for candidate in sorted(candidates, key=lambda x: (-x.score, x.start)):
+        if candidate.start < 0 or candidate.end <= candidate.start:
+            continue
+        if not 0 <= candidate.score <= 100 or candidate.score < threshold:
+            continue
+        overlap = False
+        for existing in selected:
+            shared = max(0.0, min(candidate.end, existing.end) - max(candidate.start, existing.start))
+            shorter = min(candidate.end - candidate.start, existing.end - existing.start)
+            if shared / shorter > max_overlap_ratio:
+                overlap = True
+                break
+        if not overlap:
+            selected.append(candidate)
+        if len(selected) >= max_count:
+            break
+    return selected

@@ -30,8 +30,6 @@ def main():
                 try:
                     clip = db.session.get(Clip, clip_id)
                 except Exception:
-                    # Reset a failed SQLAlchemy transaction before the next clip.
-                    db.session.rollback()
                     raise
                 if clip is None:
                     failed += 1
@@ -45,6 +43,9 @@ def main():
                 rendered += 1
                 print("Rendered clip:", clip_id, exported.get("captioned_path") or exported["path"])
             except Exception as exc:
+                # A failed render may have flushed DB changes; reset the session
+                # before looking up or rendering the next candidate.
+                db.session.rollback()
                 failed += 1
                 print("Clip", clip_id, "failed:", type(exc).__name__)
         print(f"Pipeline summary: rendered={rendered}, already_ready={already_ready}, failed={failed}")

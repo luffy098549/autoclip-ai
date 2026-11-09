@@ -25,7 +25,7 @@ def test_postgres_migrated_schema_and_foreign_keys():
         }.issubset(set(inspector.get_table_names()))
         assert db.session.execute(
             text("SELECT version_num FROM alembic_version")
-        ).scalar_one()=="20261109_001"
+        ).scalar_one()=="20261109_002"
 
 
 def test_postgres_transaction_roundtrip():

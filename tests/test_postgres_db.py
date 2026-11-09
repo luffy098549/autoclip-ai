@@ -60,3 +60,35 @@ def test_postgres_transaction_roundtrip():
         assert item.id is not None
         db.session.rollback()
         assert Streamer.query.filter_by(channel_identifier="test-ci-transaction").first() is None
+
+
+def test_postgres_enforces_relationships_and_idempotency_constraints():
+    """Verify important constraints exist in the migrated PostgreSQL schema."""
+    app = create_app({"TESTING": True})
+    with app.app_context():
+        inspector = inspect(db.engine)
+        expected_foreign_keys = {
+            "sources": ("streamer_id", "streamers"),
+            "clips": ("source_id", "sources"),
+            "publications": ("clip_id", "clips"),
+            "transcript_segments": ("source_id", "sources"),
+            "performance_metrics": ("clip_id", "clips"),
+            "competitor_videos": ("streamer_id", "streamers"),
+        }
+        for table, (column, parent) in expected_foreign_keys.items():
+            foreign_keys = inspector.get_foreign_keys(table)
+            assert any(
+                key["constrained_columns"] == [column]
+                and key["referred_table"] == parent
+                for key in foreign_keys
+            ), f"Missing foreign key: {table}.{column} -> {parent}"
+
+        publication_uniques = inspector.get_unique_constraints("publications")
+        publication_indexes = inspector.get_indexes("publications")
+        assert any(
+            constraint["column_names"] == ["idempotency_key"]
+            for constraint in publication_uniques
+        ) or any(
+            index["column_names"] == ["idempotency_key"] and index.get("unique")
+            for index in publication_indexes
+        ), "Publication idempotency keys must be unique"

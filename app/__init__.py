@@ -33,6 +33,7 @@ def create_app(config=None):
         PROCESSING_ENABLED=os.getenv("PROCESSING_ENABLED", "false").lower() == "true",
         AI_ENABLED=os.getenv("AI_ENABLED", "false").lower() == "true",
         AUTO_RENDER_ENABLED=os.getenv("AUTO_RENDER_ENABLED", "false").lower() == "true",
+        AUTO_CAPTION_ENABLED=os.getenv("AUTO_CAPTION_ENABLED", "false").lower() == "true",
         MONITORING_ENABLED=os.getenv("MONITORING_ENABLED", "false").lower() == "true",
         READ_ONLY_DEPLOYMENT=os.getenv("READ_ONLY_DEPLOYMENT", "false").lower() == "true",
     )

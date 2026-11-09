@@ -19,7 +19,15 @@
   <button class="button" type="submit">Crear tarea de recorte</button>
 </form><p class="smallprint">Con Docker y PROCESSING_ENABLED=true, Celery editará el clip automáticamente. Si el worker falla, el clip quedará en espera para procesarlo manualmente.</p>
 <div id="clip-feedback" class="form-feedback" aria-live="polite"></div></section>
-<section class="panel"><h2>Mis fuentes</h2><div id="source-list" class="data-list"></div></section>
+<section class="panel"><h2>Mis fuentes</h2>
+  <div id="source-list" class="data-list"></div>
+  <section id="transcript-viewer" hidden aria-live="polite">
+    <div class="section-heading"><h3>Transcripción de la fuente</h3>
+      <button type="button" class="button ghost" id="transcript-close">Cerrar</button>
+    </div>
+    <div id="transcript-text" class="transcript-lines"></div>
+  </section>
+</section>
 <section class="panel">
   <div class="section-heading"><h2>Biblioteca de clips</h2><span class="tag">Vista previa privada</span></div>
   <div class="library-toolbar">

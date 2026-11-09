@@ -23,8 +23,14 @@ def process_clip(clip_id: int):
                                  end=clip.end_seconds, authorized=True)
         from .subtitle_export import export_clip_srt
         subtitles = Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{clip.id}.srt"
-        export_clip_srt(clip.id, subtitles)
+        subtitle_path = export_clip_srt(clip.id, subtitles)
         clip.output_path = info["path"]
+        if subtitle_path and current_app.config.get("AUTO_CAPTION_ENABLED"):
+            from .caption_burn import burn_subtitles
+            captioned = target.with_name(f"clip-{clip.id}-captioned.mp4")
+            burn_subtitles(info["path"], subtitle_path, captioned)
+            clip.output_path = str(captioned)
+            info["captioned_path"] = str(captioned)
         clip.editorial_status = "ready"
         db.session.commit()
         return info

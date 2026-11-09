@@ -319,3 +319,25 @@ def public_competitor_videos():
             [v.view_count for v in items if v.streamer_id == x.streamer_id]),
     } for x in items]
     return jsonify(items=data, note="Métricas públicas; no representan ingresos ni derechos de reutilización.")
+
+
+@api_bp.get("/sources/<int:source_id>/transcript")
+@admin_only
+def source_transcript(source_id):
+    source = db.session.get(MediaSource, source_id)
+    if not source:
+        return jsonify(error="Fuente inexistente"), 404
+    from ..models import TranscriptSegment
+    entries = TranscriptSegment.query.filter_by(source_id=source.id).order_by(
+        TranscriptSegment.start_seconds.asc(), TranscriptSegment.id.asc()
+    ).limit(500).all()
+    return jsonify(
+        source_id=source.id,
+        count=len(entries),
+        segments=[
+            {"start": x.start_seconds, "end": x.end_seconds,
+             "text": x.text, "language": x.language}
+            for x in entries
+        ],
+        note="Transcripción local; revisa su exactitud antes de publicar"
+    )

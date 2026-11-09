@@ -18,7 +18,7 @@ Automatización de edición de videos cortos **con material propio o autorizado*
 - Cola Celery/Redis para procesamiento opcional y renderizado automático posterior al análisis cuando AUTO_RENDER_ENABLED=true
 - Análisis opcional con faster-whisper (transcripción local)
 - Selector preliminar de fragmentos a partir de transcripciones; **es heurístico, no predictor de viralidad**
-- Generación de subtítulos SRT como archivo adjunto y comando opcional para incrustarlos en video
+- Generación de subtítulos SRT, lector privado de transcripciones y subtítulos incrustados opcionales durante el render
 - Reproductor privado de clips 9:16, con filtros por estado y descargas MP4/SRT
 - Calendario privado de borradores con cancelación, límites de 120 minutos y máximo 5 por red/día; sin uploads reales
 - Registro manual de métricas de clips de tus propias cuentas, gráficos por red y ranking descriptivo por visualizaciones (sin ingresos estimados)
@@ -28,8 +28,8 @@ Automatización de edición de videos cortos **con material propio o autorizado*
 
 - Descarga de directos de terceros, monitoreo en vivo de Kick o YouTube
 - Permisos de acceso/OAuth a cuentas de YouTube, TikTok o Instagram
-- Publicación real de videos o monetización
-- Reencuadre de rostros mediante IA, subtítulos incrustados en video, narración original automática
+- Publicación autónoma de videos o monetización; adaptadores oficiales manuales requieren OAuth y revisión de cada cuenta
+- Reencuadre inteligente de rostros y narración original automática
 - Análisis de rendimiento con métricas de cuentas conectadas
 - Publicación real en plataformas, auditoría de tareas avanzada y seguridad de despliegue público
 
@@ -59,7 +59,7 @@ docker compose exec web python -m scripts.export_subtitles CLIP_ID
 
 Usa `INSTALL_AI=true` antes de construir Docker si quieres incluir Whisper y `AI_ENABLED=true` solo después de instalar correctamente los modelos. Ajusta `AUTO_RENDER_ENABLED=true` para producir automáticamente los clips que el análisis seleccione; puede consumir bastante CPU/GPU.
 
-La transcripción puede consumir memoria/CPU considerable, y la primera ejecución del modelo puede requerir una descarga. Los subtítulos se generan como archivos SRT. Para crear un nuevo MP4 subtitulado, utiliza `docker compose exec web python -m scripts.burn_clip_subtitles CLIP_ID`. Requiere el filtro `subtitles` de FFmpeg. No se aplica automáticamente a cada clip.
+La transcripción puede consumir memoria/CPU considerable, y la primera ejecución del modelo puede requerir una descarga. Los subtítulos se generan como archivos SRT. Puedes activar AUTO_CAPTION_ENABLED=true para incrustarlos durante el procesamiento cuando exista transcripción. Para crear un nuevo MP4 subtitulado, utiliza `docker compose exec web python -m scripts.burn_clip_subtitles CLIP_ID`. Requiere el filtro `subtitles` de FFmpeg. No se aplica automáticamente a cada clip.
 
 ## Reglas comerciales y derechos
 

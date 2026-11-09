@@ -67,6 +67,30 @@ document.addEventListener("DOMContentLoaded", () => {
     const sources=await get("/api/sources");
     const clips=await get("/api/clips");
     drawList("source-list",sources.items,item=>item.name+" · "+item.rights);
+    document.querySelectorAll("#source-list .data-row").forEach((row,index)=>{
+      const item=sources.items[index];
+      if(!item)return;
+      const button=document.createElement("button");
+      button.type="button";button.className="button ghost";
+      button.textContent="Transcripción";
+      button.addEventListener("click",async()=>{
+        const panel=document.getElementById("transcript-viewer");
+        const output=document.getElementById("transcript-text");
+        if(!panel||!output)return;
+        panel.hidden=false;output.replaceChildren();
+        try{
+          const data=await get("/api/sources/"+item.id+"/transcript");
+          if(!data.segments.length){
+            const p=document.createElement("p");p.textContent="Esta fuente todavía no tiene transcripción.";output.append(p);
+          }else data.segments.forEach(segment=>{
+            const p=document.createElement("p");
+            p.textContent=segment.start.toFixed(1)+"s – "+segment.end.toFixed(1)+"s · "+segment.text;
+            output.append(p);
+          });
+        }catch(err){message("source-feedback",err.message,true);}
+      });
+      row.append(button);
+    });
     try {
       const status=await get("/api/status");
       if(status.ai_detection_enabled){
@@ -129,6 +153,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     loadAnalytics().catch(err=>message("metric-feedback",err.message,true));
   }
+  document.getElementById("transcript-close")?.addEventListener("click",()=>{
+    const p=document.getElementById("transcript-viewer");
+    if(p)p.hidden=true;
+  });
   const streamer=document.getElementById("streamer-form");
   if(streamer){
     streamer.addEventListener("submit",async e=>{

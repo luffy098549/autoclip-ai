@@ -39,6 +39,27 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadStreamers(){
     const data=await get("/api/streamers");
     drawList("streamer-list",data.items,item=>item.name+" · "+item.platform+" / "+item.channel);
+    try {
+      const status=await get("/api/status");
+      if(status.youtube_metadata_enabled){
+        document.querySelectorAll("#streamer-list .data-row").forEach((row,index)=>{
+          const item=data.items[index];
+          if(!item || item.platform!=="youtube")return;
+          const btn=document.createElement("button");
+          btn.type="button";btn.className="button ghost";btn.textContent="Sincronizar YouTube";
+          btn.addEventListener("click",async()=>{
+            btn.disabled=true;
+            try{const result=await send("/api/streamers/"+item.id+"/sync",{});message("streamer-feedback",result.message+" · "+result.task_id);}
+            catch(err){message("streamer-feedback",err.message,true);}
+            finally{btn.disabled=false;}
+          });
+          row.append(btn);
+        });
+      }
+      const videos=await get("/api/competitors/videos");
+      drawList("competitor-list",videos.items,item=>item.title+" · "+item.views.toLocaleString("es")+" vistas · "+item.relative_views+"× vs. mediana del canal");
+    }catch(err){message("streamer-feedback",err.message,true);}
+
     const sel=document.getElementById("source-streamer");
     if(sel){sel.replaceChildren();addOption(sel,"","Sin canal asociado");data.items.forEach(item=>addOption(sel,item.id,item.name+" ("+item.platform+")"));}
   }

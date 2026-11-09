@@ -13,6 +13,7 @@
   <div id="streamer-feedback" class="form-feedback" aria-live="polite"></div>
 </section>
 <section class="panel"><h2>Canales registrados</h2><div id="streamer-list" class="data-list"><p class="muted">Cargando…</p></div></section>
+<section class="panel"><h2>Investigación de YouTube</h2><p class="muted">Videos y métricas públicas de canales registrados. No representan ingresos ni otorgan derechos de reutilización.</p><div id="competitor-list" class="data-list"></div></section>
 {% else %}
 <section class="panel"><h2>Fuentes de creadores</h2><p class="muted">Inicia sesión como administrador para consultar y administrar los canales.</p><a class="button" href="{{ url_for('auth.login') }}">Iniciar sesión</a></section>
 {% endif %}

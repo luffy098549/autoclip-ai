@@ -49,3 +49,16 @@ def analyze_source_task(source_id: int):
             result["rendered_clip_ids"] = successes
             result["failed_clip_ids"] = failures
         return result
+
+
+@celery_app.task(name="autoclip.youtube_metadata_task")
+def youtube_metadata_task(streamer_id: int):
+    import os
+    from . import create_app
+    from .services.competitor_sync import sync_youtube_channel
+    key = os.getenv("YOUTUBE_API_KEY")
+    if not key:
+        raise RuntimeError("YOUTUBE_API_KEY missing")
+    app = create_app()
+    with app.app_context():
+        return sync_youtube_channel(streamer_id, key)

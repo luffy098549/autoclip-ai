@@ -63,3 +63,18 @@ class PerformanceMetric(db.Model):
     shares = db.Column(db.BigInteger, default=0, nullable=False)
     avg_watch_seconds = db.Column(db.Float)
     recorded_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+class CompetitorVideo(db.Model):
+    """Public YouTube metadata, not the video file or rights to reuse it."""
+    __tablename__ = "competitor_videos"
+    id = db.Column(db.Integer, primary_key=True)
+    streamer_id = db.Column(db.Integer, db.ForeignKey("streamers.id"), nullable=False, index=True)
+    video_id = db.Column(db.String(32), nullable=False)
+    title = db.Column(db.String(400), nullable=False)
+    published_at = db.Column(db.DateTime(timezone=True))
+    view_count = db.Column(db.BigInteger, nullable=False, default=0)
+    like_count = db.Column(db.BigInteger, nullable=False, default=0)
+    comment_count = db.Column(db.BigInteger, nullable=False, default=0)
+    duration_iso8601 = db.Column(db.String(32))
+    fetched_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    __table_args__ = (UniqueConstraint("streamer_id", "video_id"),)

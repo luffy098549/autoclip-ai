@@ -6,7 +6,7 @@ from flask import Blueprint, current_app, jsonify, request, send_file
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from werkzeug.utils import secure_filename
-from ..models import db, Streamer, MediaSource, Clip, Publication, PerformanceMetric
+from ..models import db, Streamer, MediaSource, Clip, Publication, PerformanceMetric, CompetitorVideo
 from ..scheduler import MAX_PER_DAY, MIN_INTERVAL, PLATFORMS, TIMEZONE
 from ..quality import inspect_video, MediaValidationError
 from ..security import admin_only
@@ -24,6 +24,7 @@ def status():
         ingestion_enabled=True,
         ai_detection_enabled=bool(current_app.config.get("AI_ENABLED")),
         auto_render_enabled=bool(current_app.config.get("AUTO_RENDER_ENABLED")),
+        youtube_metadata_enabled=bool(current_app.config.get("MONITORING_ENABLED")),
         platforms=list(PLATFORMS),
         interval_minutes=int(MIN_INTERVAL.total_seconds() / 60),
         daily_limit_per_platform=MAX_PER_DAY,
@@ -280,3 +281,40 @@ def job_status(task_id):
     elif state == "FAILURE":
         response["error"] = "La tarea falló. Consulta los registros del worker."
     return jsonify(response)
+
+
+@api_bp.post("/streamers/<int:streamer_id>/sync")
+@admin_only
+def sync_public_channel_metadata(streamer_id):
+    """Queue metadata-only YouTube sync. Does not download media."""
+    import os
+    if not current_app.config.get("MONITORING_ENABLED") or not os.getenv("YOUTUBE_API_KEY"):
+        return jsonify(error="Activa MONITORING_ENABLED y configura YOUTUBE_API_KEY"), 503
+    streamer = db.session.get(Streamer, streamer_id)
+    if not streamer:
+        return jsonify(error="Canal inexistente"), 404
+    if streamer.platform != "youtube":
+        return jsonify(error="Solo se admite la API de YouTube en esta fase"), 400
+    from ..tasks import youtube_metadata_task
+    try:
+        task = youtube_metadata_task.delay(streamer_id)
+    except Exception:
+        return jsonify(error="Worker no disponible"), 503
+    return jsonify(task_id=task.id, message="Sincronización de metadatos encolada"), 202
+
+
+@api_bp.get("/competitors/videos")
+@admin_only
+def public_competitor_videos():
+    from ..intelligence.competitive_patterns import relative_performance
+    items = CompetitorVideo.query.order_by(
+        CompetitorVideo.view_count.desc(), CompetitorVideo.id.desc()
+    ).limit(100).all()
+    data = [{
+        "streamer_id": x.streamer_id, "video_id": x.video_id, "title": x.title,
+        "views": x.view_count, "likes": x.like_count, "comments": x.comment_count,
+        "published_at": x.published_at.isoformat() if x.published_at else None,
+        "relative_views": relative_performance(x.view_count,
+            [v.view_count for v in items if v.streamer_id == x.streamer_id]),
+    } for x in items]
+    return jsonify(items=data, note="Métricas públicas; no representan ingresos ni derechos de reutilización.")

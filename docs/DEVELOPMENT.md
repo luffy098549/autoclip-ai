@@ -7,7 +7,7 @@
 3. Generate a secret for `SECRET_KEY` with `python -c "import secrets;print(secrets.token_hex(32))"`.
 4. Generate a password hash using `python -m scripts.hash_password` from an environment with project dependencies installed; copy its result to `ADMIN_PASSWORD_HASH` in your private `.env`.
 5. Run `docker compose up --build -d`.
-6. Run `docker compose exec web python -m scripts.init_db`.
+6. Apply migrations: `docker compose exec web python -m scripts.init_db`.
 7. Open `http://localhost:8000/login` and sign in.
 8. Register a channel in Streamers, then upload a **licensed or owned** video in Clips.
 9. In Clips, create a recut request with start and end seconds.
@@ -48,9 +48,22 @@ The published video must still be editorially reviewed.
 
 - `AI_ENABLED` enables a Celery task endpoint but does not grant Kick, YouTube, TikTok or Instagram permissions.
 - `PROCESSING_ENABLED` only queues FFmpeg work; it **does not** enable social media uploads.
-- The repository has no production-ready database migration mechanism yet. The initial `create_all` is a development aid.
+- Use Flask-Migrate/Alembic revisions committed under migrations/. To update an existing database previously initialized via create_all, take a backup and verify the schema with an administrator before carefully stamping the revision; do not automatically stamp an unknown database.
 
 ## Calendario privado
 Abre /publications, selecciona un clip terminado, una red y la fecha/hora local de Nueva York. El programa crea solo un borrador en la tabla publications; no envía archivos a plataformas externas. Puedes cancelar planes pendientes. Comprueba que cada red tiene un máximo de 5 borradores activos al día y un intervalo mínimo de 120 minutos entre ellos.
 
 En PostgreSQL, un bloqueo de asesoramiento por plataforma protege el calendario ante dos solicitudes concurrentes. El modo SQLite para pruebas no ofrece la misma garantía de concurrencia.
+
+## Versioned database migrations
+
+PostgreSQL 16 is the principal database. All seven data tables are created by the first Alembic revision. To set up a **fresh** database:
+
+1. Start the PostgreSQL container with docker compose up -d db.
+2. Run docker compose exec web python -m scripts.init_db after the web service is built.
+3. Verify with docker compose exec web flask --app run:app db current.
+4. When models evolve, review and commit generated revisions with flask --app run:app db migrate -m "Describe changes" then apply with flask --app run:app db upgrade.
+
+GitHub Actions tests the same migration on PostgreSQL 16 and validates insert/rollback behavior. SQLite remains available only for isolated unit tests.
+
+**Existing databases:** If tables were created with an older create_all script, do not rerun the initial revision blindly. Back up the database and reconcile the existing schema before stamping; an incorrect stamp can hide missing columns or constraints.

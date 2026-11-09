@@ -3,7 +3,7 @@ on:
   push:
   pull_request:
 jobs:
-  test:
+  unit-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -11,5 +11,33 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install -r requirements.txt
-      - run: python -m compileall -q app scripts run.py tests
+      - run: python -m compileall -q app scripts migrations run.py tests
       - run: python -m pytest -q
+  postgres-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: autoclip
+          POSTGRES_USER: autoclip
+          POSTGRES_PASSWORD: ci-only-test-password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U autoclip -d autoclip"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      DATABASE_URL: postgresql+psycopg://autoclip:ci-only-test-password@localhost:5432/autoclip
+      SECRET_KEY: ci-only-long-random-placeholder-not-production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - name: Apply PostgreSQL migrations
+        run: python -m scripts.init_db
+      - name: Validate PostgreSQL schema and transaction rollback
+        run: python -m pytest -q tests/test_postgres_db.py

@@ -3,15 +3,17 @@ import os
 import secrets
 from flask import Flask, jsonify
 from flask_wtf.csrf import CSRFProtect
+from flask_migrate import Migrate
 from .models import db
 
 csrf = CSRFProtect()
+migrate = Migrate()
 
 
 def create_app(config=None):
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.config.update(
-        SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL", "sqlite:///autoclip.db"),
+        SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL", "postgresql+psycopg://autoclip:autoclip@db:5432/autoclip"),
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         SECRET_KEY=os.getenv("SECRET_KEY") or secrets.token_hex(32),
         ADMIN_PASSWORD_HASH=os.getenv("ADMIN_PASSWORD_HASH", ""),
@@ -32,6 +34,7 @@ def create_app(config=None):
             app.config["SECRET_KEY"] == "replace-with-unique-random-secret"):
         raise RuntimeError("Set a strong SECRET_KEY before enabling admin login")
     db.init_app(app)
+    migrate.init_app(app, db)
     csrf.init_app(app)
 
     from .security import auth_bp

@@ -10,6 +10,7 @@ Automatización de edición de videos cortos **con material propio o autorizado*
 - Inicio de sesión del propietario (contraseña con hash), sesiones y protección CSRF
 - Registro de canales de Kick/YouTube **sin descargar videos automáticamente**
 - Consulta opcional de metadatos públicos de canales/videos con la API oficial de YouTube (requiere clave propia)
+- PostgreSQL como base de datos principal con migraciones versionadas Alembic/Flask-Migrate y pruebas de integración en CI
 - Carga de videos propios/autorizados y registro de fuentes en PostgreSQL
 - Solicitudes de recorte y renderizado vertical 1080×1920 con FFmpeg
 - Cola Celery/Redis para procesamiento opcional y renderizado automático posterior al análisis cuando AUTO_RENDER_ENABLED=true
@@ -28,7 +29,7 @@ Automatización de edición de videos cortos **con material propio o autorizado*
 - Publicación real de videos o monetización
 - Reencuadre de rostros mediante IA, subtítulos incrustados en video, narración original automática
 - Análisis de rendimiento con métricas de cuentas conectadas
-- Motor de publicaciones transaccional, migraciones de producción y seguridad de despliegue público
+- Publicación real en plataformas, auditoría de tareas avanzada y seguridad de despliegue público
 
 **Ningún video se publica automáticamente en redes en esta versión.**
 
@@ -37,7 +38,7 @@ Automatización de edición de videos cortos **con material propio o autorizado*
 1. Copia `.env.example` a `.env`. Sustituye SECRET_KEY por una cadena aleatoria.
 2. Ejecuta `python -m scripts.hash_password` en un entorno con las dependencias instaladas. Copia el hash generado a `ADMIN_PASSWORD_HASH` en `.env` (no publiques la contraseña).
 3. Ejecuta `docker compose up --build -d`.
-4. Crea las tablas: `docker compose exec web python -m scripts.init_db`.
+4. Aplica las migraciones: `docker compose exec web python -m scripts.init_db`.
 5. Abre `http://localhost:8000/login` e inicia sesión.
 6. En **Streamers**, registra el canal; en **Clips**, carga un video autorizado.
 7. Elige inicio/final y crea la tarea. Procesa manualmente con `docker compose exec web python -m scripts.process_clip ID` si no activaste workers.

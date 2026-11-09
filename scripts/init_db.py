@@ -1,8 +1,8 @@
-"""Run once after database service is healthy: python -m scripts.init_db"""
+"""Apply version-controlled database migrations instead of create_all."""
+from flask_migrate import upgrade
 from app import create_app
-from app.models import db
 
-app = create_app()
+app=create_app()
 with app.app_context():
-    db.create_all()
-print("Created initial development tables. Use Alembic for future schema migrations.")
+    upgrade()
+print("Applied Alembic migrations successfully.")

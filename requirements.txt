@@ -7,3 +7,4 @@ celery[redis]>=5.4,<6
 python-dotenv>=1.0,<2
 pytest>=8,<10
 gunicorn>=23,<26
+Flask-Migrate>=4.0,<5

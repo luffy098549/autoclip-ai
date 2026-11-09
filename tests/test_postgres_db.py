@@ -160,3 +160,33 @@ def test_postgres_rejects_orphan_clip_and_recovers_transaction():
             db.session.rollback()
         # A query after rollback confirms the session is usable again.
         assert db.session.execute(text("SELECT 1")).scalar_one() == 1
+
+
+def test_postgres_rejects_duplicate_streamer_identity():
+    """Streamer identity is unique per platform, even across separate rows."""
+    from uuid import uuid4
+    from sqlalchemy.exc import IntegrityError
+
+    app = create_app({"TESTING": True})
+    with app.app_context():
+        channel = f"ci-streamer-{uuid4().hex}"
+        try:
+            db.session.add(Streamer(
+                display_name="Synthetic CI streamer", platform="youtube",
+                channel_identifier=channel, active=False,
+            ))
+            db.session.flush()
+            db.session.add(Streamer(
+                display_name="Duplicate synthetic streamer", platform="youtube",
+                channel_identifier=channel, active=False,
+            ))
+            with pytest.raises(IntegrityError):
+                db.session.flush()
+        finally:
+            db.session.rollback()
+
+        assert db.session.execute(
+            text("SELECT count(*) FROM streamers WHERE channel_identifier = :channel"),
+            {"channel": channel},
+        ).scalar_one() == 0
+        assert db.session.execute(text("SELECT 1")).scalar_one() == 1

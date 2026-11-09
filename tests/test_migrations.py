@@ -8,7 +8,7 @@ from app.models import db
 
 EXPECTED={
     "streamers","sources","clips","publications",
-    "transcript_segments","performance_metrics","competitor_videos","alembic_version"
+    "transcript_segments","performance_metrics","competitor_videos","daily_review_slots","alembic_version"
 }
 
 
@@ -23,6 +23,6 @@ def test_initial_migration_sqlite(tmp_path):
         tables=set(inspect(db.engine).get_table_names())
         assert EXPECTED.issubset(tables)
         revision=db.session.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-        assert revision=="20261109_001"
+        assert revision=="20261109_002"
         upgrade()  # applying migrations twice must be safe and idempotent
         assert db.session.execute(text("SELECT COUNT(*) FROM alembic_version")).scalar_one()==1

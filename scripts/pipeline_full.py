@@ -25,12 +25,14 @@ def main():
         rendered = 0
         failed = 0
         already_ready = 0
+        seen_clip_ids = set()
         for clip_id in result["clip_ids"]:
+            if clip_id in seen_clip_ids:
+                print("Skipping duplicate clip:", clip_id)
+                continue
+            seen_clip_ids.add(clip_id)
             try:
-                try:
-                    clip = db.session.get(Clip, clip_id)
-                except Exception:
-                    raise
+                clip = db.session.get(Clip, clip_id)
                 if clip is None:
                     failed += 1
                     print("Clip", clip_id, "failed: not found")

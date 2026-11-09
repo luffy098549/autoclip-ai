@@ -92,3 +92,45 @@ def test_postgres_enforces_relationships_and_idempotency_constraints():
             index["column_names"] == ["idempotency_key"] and index.get("unique")
             for index in publication_indexes
         ), "Publication idempotency keys must be unique"
+
+
+def test_postgres_rejects_duplicate_publication_idempotency_keys():
+    """Exercise the real database constraint, not just schema introspection."""
+    from datetime import datetime, timezone
+    from uuid import uuid4
+    from sqlalchemy.exc import IntegrityError
+
+    app = create_app({"TESTING": True})
+    with app.app_context():
+        key = f"ci-duplicate-{uuid4().hex}"
+        try:
+            source = MediaSource(
+                source_uri="ci-owned-fixture.mp4", rights_status="owned",
+                permission_evidence="Synthetic CI fixture; no external download",
+            )
+            db.session.add(source)
+            db.session.flush()
+            clip = Clip(source_id=source.id, start_seconds=0, end_seconds=10)
+            db.session.add(clip)
+            db.session.flush()
+            db.session.add(Publication(
+                clip_id=clip.id, platform="youtube",
+                scheduled_at=datetime.now(timezone.utc),
+                state="planned", idempotency_key=key,
+            ))
+            db.session.flush()
+            db.session.add(Publication(
+                clip_id=clip.id, platform="youtube",
+                scheduled_at=datetime.now(timezone.utc),
+                state="planned", idempotency_key=key,
+            ))
+            with pytest.raises(IntegrityError):
+                db.session.flush()
+        finally:
+            # PostgreSQL aborts the transaction after an integrity error.
+            # Roll back every fixture row, including the first publication.
+            db.session.rollback()
+        assert db.session.execute(
+            text("SELECT count(*) FROM publications WHERE idempotency_key = :key"),
+            {"key": key},
+        ).scalar_one() == 0

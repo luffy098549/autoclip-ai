@@ -40,15 +40,14 @@ def _parse_ny_time(raw: object) -> datetime:
         raise ValueError("Usa fecha y hora con formato AAAA-MM-DDTHH:MM")
     naive = datetime.fromisoformat(raw)
     local = naive.replace(tzinfo=TIMEZONE)
-    # An ambiguous fall-back hour maps to two distinct UTC instants.
-    # Refuse to guess which one the user intended.
-    alternate = naive.replace(tzinfo=TIMEZONE, fold=1)
-    if local.utcoffset() != alternate.utcoffset():
-        raise ValueError("La hora es ambigua por el cambio horario; elige otra hora")
-    # Reject non-existent wall times caused by daylight-saving jumps.
+    # Reject non-existent spring-forward times before checking fall-back ambiguity.
     roundtrip = local.astimezone(timezone.utc).astimezone(TIMEZONE)
     if roundtrip.replace(tzinfo=None) != naive:
         raise ValueError("La hora elegida no existe por el cambio horario")
+    # Fall-back times can represent two different UTC instants; never guess.
+    alternate = naive.replace(tzinfo=TIMEZONE, fold=1)
+    if local.utcoffset() != alternate.utcoffset():
+        raise ValueError("La hora es ambigua por el cambio horario; elige otra hora")
     return local.astimezone(timezone.utc)
 
 

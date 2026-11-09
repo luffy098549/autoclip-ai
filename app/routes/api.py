@@ -124,7 +124,8 @@ def clips():
         items = Clip.query.order_by(Clip.id.desc()).limit(100).all()
         return jsonify(items=[{
             "id": c.id, "source_id": c.source_id, "start": c.start_seconds,
-            "end": c.end_seconds, "status": c.editorial_status, "score": c.score
+            "end": c.end_seconds, "status": c.editorial_status, "score": c.score,
+            "has_subtitles": (Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{c.id}.srt").is_file()
         } for c in items])
     data = request.get_json(silent=True) or {}
     try:
@@ -192,3 +193,16 @@ def download_clip(clip_id):
         return jsonify(error="Archivo de clip no disponible"), 404
     return send_file(path, as_attachment=True, download_name=f"autoclip-{clip.id}.mp4",
                      mimetype="video/mp4")
+
+
+@api_bp.get("/clips/<int:clip_id>/subtitles")
+@admin_only
+def download_subtitles(clip_id):
+    clip = db.session.get(Clip, clip_id)
+    if not clip:
+        return jsonify(error="Clip inexistente"), 404
+    path = Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{clip_id}.srt"
+    if not path.is_file():
+        return jsonify(error="Subtítulos no disponibles"), 404
+    return send_file(path, as_attachment=True, download_name=f"autoclip-{clip.id}.srt",
+                     mimetype="application/x-subrip")

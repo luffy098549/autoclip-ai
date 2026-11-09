@@ -14,7 +14,7 @@ Automatización de edición de videos cortos **con material propio o autorizado*
 - Cola Celery/Redis para procesamiento opcional
 - Análisis opcional con faster-whisper (transcripción local)
 - Selector preliminar de fragmentos a partir de transcripciones; **es heurístico, no predictor de viralidad**
-- Generación de subtítulos SRT como archivo adjunto
+- Generación de subtítulos SRT como archivo adjunto y comando opcional para incrustarlos en video
 - Límite de planificación: al menos 120 minutos entre publicaciones y máximo 5 por red/día
 - Pruebas automatizadas con GitHub Actions
 
@@ -53,7 +53,7 @@ docker compose exec web python -m scripts.export_subtitles CLIP_ID
 
 Usa `INSTALL_AI=true` antes de construir Docker si quieres incluir Whisper y `AI_ENABLED=true` solo después de instalar correctamente los modelos.
 
-La transcripción puede consumir memoria/CPU considerable, y la primera ejecución del modelo puede requerir una descarga. Los subtítulos se generan como archivos SRT; **todavía no están incrustados en el MP4**.
+La transcripción puede consumir memoria/CPU considerable, y la primera ejecución del modelo puede requerir una descarga. Los subtítulos se generan como archivos SRT. Para crear un nuevo MP4 subtitulado, utiliza `docker compose exec web python -m scripts.burn_clip_subtitles CLIP_ID`. Requiere el filtro `subtitles` de FFmpeg. No se aplica automáticamente a cada clip.
 
 ## Reglas comerciales y derechos
 

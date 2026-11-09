@@ -78,6 +78,13 @@ document.addEventListener("DOMContentLoaded", () => {
         link.textContent="Descargar MP4";
         row.append(link);
       }
+      if(item && item.has_subtitles){
+        const link=document.createElement("a");
+        link.className="button ghost";
+        link.href="/api/clips/"+item.id+"/subtitles";
+        link.textContent="Descargar SRT";
+        row.append(link);
+      }
     });
     const sel=document.getElementById("clip-source");
     if(sel){const previous=sel.value;sel.replaceChildren();addOption(sel,"","Selecciona una fuente");sources.items.forEach(item=>addOption(sel,item.id,"Fuente "+item.id+" · "+item.name));sel.value=previous;}

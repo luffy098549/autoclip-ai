@@ -38,6 +38,16 @@
   </div>
   <div id="clip-gallery" class="clip-gallery" aria-live="polite"></div>
 </section>
+<section class="panel" id="daily-review" aria-label="Revisión diaria de clips">
+  <div class="section-heading"><h2>Mejores clips del día</h2><span class="tag">Revisión manual</span></div>
+  <p class="muted">Selección de clips listos con derechos verificados. La publicación automática está desactivada.</p>
+  <div class="library-toolbar">
+    <label>Cantidad<select id="daily-review-limit"><option value="5" selected>5 clips</option><option value="10">10 clips</option><option value="20">20 clips</option></select></label>
+    <button type="button" class="button ghost" id="daily-review-refresh">Actualizar selección</button>
+  </div>
+  <p id="daily-review-status" role="status" aria-live="polite">Cargando selección…</p>
+  <div id="daily-review-gallery" class="daily-review-grid"></div>
+</section>
 <section class="panel"><h3>Estado detallado</h3><div id="clip-list" class="data-list"></div></section>
 {% else %}
 <section class="panel"><h2>Biblioteca de clips</h2><p class="muted">Inicia sesión como administrador para importar material y preparar videos.</p><a class="button" href="{{ url_for('auth.login') }}">Iniciar sesión</a></section>

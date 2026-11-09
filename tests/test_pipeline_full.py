@@ -118,3 +118,22 @@ def test_clip_lookup_error_does_not_stop_other_renders(capsys):
     assert "Clip 1 failed: RuntimeError" in output
     assert "Rendered clip: 2 clip-2.mp4" in output
     assert "Pipeline summary: rendered=1, already_ready=0, failed=1" in output
+
+
+def test_duplicate_clip_ids_are_rendered_only_once(capsys):
+    fake_app = SimpleNamespace(app_context=lambda: _Context())
+    with (patch.object(sys, "argv", ["pipeline_full", "42"]),
+          patch.object(pipeline_full, "create_app", return_value=fake_app),
+          patch.object(pipeline_full, "analyze_source", return_value={
+              "transcript_segments": 2, "candidate_count": 2, "clip_ids": [7, 7, 8]
+          }),
+          patch.object(pipeline_full.db.session, "get",
+                       return_value=SimpleNamespace(editorial_status="pending")) as lookup,
+          patch.object(pipeline_full, "process_clip",
+                       return_value={"path": "clip.mp4"}) as render):
+        pipeline_full.main()
+    assert [call.args[1] for call in lookup.call_args_list] == [7, 8]
+    assert [call.args[0] for call in render.call_args_list] == [7, 8]
+    output = capsys.readouterr().out
+    assert "Skipping duplicate clip: 7" in output
+    assert "Pipeline summary: rendered=2, already_ready=0, failed=0" in output

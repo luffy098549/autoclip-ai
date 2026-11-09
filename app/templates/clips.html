@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel"><div class="section-heading"><h2>Biblioteca de clips</h2><span class="tag">Preparación local</span></div><p class="muted">La edición local con FFmpeg ya dispone de un comando Python. Esta página se conectará a la biblioteca cuando estén listos los endpoints protegidos.</p>
+<div class="empty"><span class="empty-icon">▣</span><h3>No hay clips para visualizar</h3><p>Prueba con un video sobre el que tengas derechos: <code>python -m scripts.clip_local input.mp4 output.mp4 --start 10 --end 35 --authorized</code></p></div>
+</section>
+{% endblock %}

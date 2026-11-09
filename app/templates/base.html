@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="description" content="Panel de desarrollo de AutoClip AI">
+  <title>{{ title }} · AutoClip AI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script defer src="{{ url_for('static', filename='js/app.js') }}"></script>
+</head>
+<body>
+  <a href="#main" class="skip-link">Saltar al contenido</a>
+  <div class="shell">
+    <aside class="sidebar" id="sidebar">
+      <a href="{{ url_for('dashboard.index') }}" class="brand"><span class="brand-icon">✦</span><span>AutoClip <b>AI</b><small>CONTROL CENTER</small></span></a>
+      <nav aria-label="Navegación principal">
+        <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if request.path == '/' else '' }}">⌂ <span>Dashboard</span></a>
+        <a href="{{ url_for('dashboard.streamers') }}" class="{{ 'active' if request.path == '/streamers' else '' }}">◉ <span>Streamers</span></a>
+        <a href="{{ url_for('dashboard.clips') }}" class="{{ 'active' if request.path == '/clips' else '' }}">▣ <span>Biblioteca de clips</span></a>
+        <a href="{{ url_for('dashboard.publications') }}" class="{{ 'active' if request.path == '/publications' else '' }}">◷ <span>Publicaciones</span></a>
+        <a href="{{ url_for('dashboard.analytics') }}" class="{{ 'active' if request.path == '/analytics' else '' }}">▥ <span>Analíticas</span></a>
+        <a href="{{ url_for('dashboard.settings') }}" class="{{ 'active' if request.path == '/settings' else '' }}">⚙ <span>Configuración</span></a>
+      </nav>
+      <div class="sidebar-footer">Versión 0.2.0 <span class="status-pill">Modo desarrollo</span></div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar">
+        <button id="menu-toggle" aria-label="Abrir menú" aria-controls="sidebar" aria-expanded="false" class="mobile-menu">☰</button>
+        <div><p class="eyebrow">AUTOCLIP AI / CONTROL CENTER</p><h1>{{ title }}</h1></div>
+        <div class="topbar-actions"><span class="offline-indicator"><span class="dot"></span> Publicación desactivada</span></div>
+      </header>
+      <main id="main" class="main-content">
+        <div class="notice" role="status"><b>Proyecto en desarrollo.</b> El panel consulta el estado real de los servicios. Todavía no descarga transmisiones, genera clips con IA ni publica en redes.</div>
+        {% block content %}{% endblock %}
+      </main>
+      <footer class="footer">© AutoClip AI · Material autorizado y contenido original · <a href="https://github.com/luffy098549/autoclip-ai" rel="noopener noreferrer" target="_blank">GitHub</a></footer>
+    </div>
+  </div>
+</body>
+</html>

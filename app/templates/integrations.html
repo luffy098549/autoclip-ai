@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel">
+  <div class="section-heading"><h2>Integraciones oficiales</h2><span class="tag">Conexiones de cuentas</span></div>
+  <p class="muted">El código de AutoClip AI está preparado para comunicarse con las APIs oficiales. Las cuentas solo podrán utilizarse después de que su propietario conceda acceso a cada aplicación.</p>
+  {% if session.get('admin_authenticated') %}
+  <div class="integration-status" id="integration-readiness" aria-live="polite">Comprobando configuración…</div>
+  {% else %}
+  <p class="muted">Inicia sesión para conocer el estado privado de la integración.</p>
+  <a class="button" href="{{ url_for('auth.login') }}">Iniciar sesión</a>
+  {% endif %}
+</section>
+<div class="integration-grid">
+  <article class="panel integration-card">
+    <div class="section-heading"><h3>YouTube Shorts</h3><span class="tag">OAuth 2.0</span></div>
+    <p>La autorización de tu canal se realiza en Google, con el permiso limitado <code>youtube.upload</code>. El primer envío de prueba debe ser privado.</p>
+    <p class="smallprint">Paso de configuración local: <code>python -m scripts.youtube_oauth</code></p>
+    <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" rel="noopener noreferrer" target="_blank">YouTube Data API</a>
+  </article>
+  <article class="panel integration-card">
+    <div class="section-heading"><h3>TikTok</h3><span class="tag">video.publish</span></div>
+    <p>Necesitas una aplicación aprobada, autorización de tu cuenta y los ajustes de privacidad admitidos por la API. Los clientes sin auditoría tienen restricciones de publicaciones privadas.</p>
+    <a href="https://developers.tiktok.com/" rel="noopener noreferrer" target="_blank">TikTok for Developers</a>
+  </article>
+  <article class="panel integration-card">
+    <div class="section-heading"><h3>Instagram Reels</h3><span class="tag">Graph API</span></div>
+    <p>Requiere una cuenta profesional, un token autorizado y videos alojados en un dominio HTTPS propio. La publicación necesita que el contenedor esté procesado.</p>
+    <a href="https://developers.facebook.com/docs/instagram-platform/content-publishing/" rel="noopener noreferrer" target="_blank">Instagram Platform</a>
+  </article>
+  <article class="panel integration-card">
+    <div class="section-heading"><h3>Alojamiento</h3><span class="tag">Render</span></div>
+    <p>Existe una plantilla para desplegar una demostración en Render con PostgreSQL. Para producción faltan almacenamiento persistente compartido y workers seguros.</p>
+    <a href="https://dashboard.render.com/select-repo?type=blueprint" rel="noopener noreferrer" target="_blank">Panel de Render</a>
+  </article>
+</div>
+<p class="smallprint">No pegues contraseñas, secretos, tokens ni claves de acceso en este formulario o en GitHub. Consulta las guías privadas del proyecto para configurar cada servicio.</p>
+{% endblock %}

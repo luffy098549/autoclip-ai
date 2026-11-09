@@ -15,12 +15,14 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/jobs.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/analytics-charts.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/transcripts.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/integrations.css') }}">
   <script defer src="{{ url_for('static', filename='js/app.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/catalog.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/planning.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/library.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/system.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/jobs.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='js/integrations.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/analytics-charts.js') }}"></script>
 </head>
 <body>
@@ -36,6 +38,7 @@
         <a href="{{ url_for('dashboard.publications') }}" class="{{ 'active' if request.path == '/publications' else '' }}">◷ <span>Publicaciones</span></a>
         <a href="{{ url_for('dashboard.analytics') }}" class="{{ 'active' if request.path == '/analytics' else '' }}">▥ <span>Analíticas</span></a>
         <a href="{{ url_for('dashboard.settings') }}" class="{{ 'active' if request.path == '/settings' else '' }}">⚙ <span>Configuración</span></a>
+        <a href="{{ url_for('dashboard.integrations') }}" class="{{ 'active' if request.path == '/integrations' else '' }}">◎ <span>Integraciones</span></a>
       </nav>
       <div class="sidebar-footer">Versión 0.5.0 <span class="status-pill">Modo desarrollo</span></div>
     </aside>

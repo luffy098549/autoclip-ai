@@ -50,3 +50,8 @@ def settings():
 @dashboard_bp.get("/jobs")
 def jobs():
     return render_page("jobs.html", "Trabajos")
+
+
+@dashboard_bp.get("/integrations")
+def integrations():
+    return render_page("integrations.html", "Integraciones")

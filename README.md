@@ -6,7 +6,7 @@ Automatización de edición de videos cortos **con material propio o autorizado*
 
 ## Implementado
 
-- Panel web responsive: Dashboard, Streamers, Clips, Publicaciones, Analíticas y Configuración
+- Panel web responsive: Dashboard, Streamers, Clips, Publicaciones, Analíticas, Configuración e Integraciones
 - Pantalla de trabajos con estados reales de la cola y actualización mientras está visible
 - Estado real de PostgreSQL y módulos del backend en la página de configuración; estadísticas de negocio privadas
 - Inicio de sesión del propietario (contraseña con hash), sesiones y protección CSRF
@@ -28,7 +28,7 @@ Automatización de edición de videos cortos **con material propio o autorizado*
 
 - Descarga de directos de terceros, monitoreo en vivo de Kick o YouTube
 - Permisos de acceso/OAuth a cuentas de YouTube, TikTok o Instagram
-- Publicación autónoma de videos o monetización; adaptadores oficiales manuales requieren OAuth y revisión de cada cuenta
+- Publicación autónoma de videos o monetización; integraciones manuales requieren OAuth, permisos de apps y revisión de cada cuenta
 - Reencuadre inteligente de rostros y narración original automática
 - Análisis de rendimiento con métricas de cuentas conectadas
 - Publicación real en plataformas, auditoría de tareas avanzada y seguridad de despliegue público

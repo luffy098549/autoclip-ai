@@ -11,7 +11,7 @@ Automatización de edición de videos cortos **con material propio o autorizado*
 - Registro de canales de Kick/YouTube **sin descargar videos automáticamente**
 - Carga de videos propios/autorizados y registro de fuentes en PostgreSQL
 - Solicitudes de recorte y renderizado vertical 1080×1920 con FFmpeg
-- Cola Celery/Redis para procesamiento opcional
+- Cola Celery/Redis para procesamiento opcional y renderizado automático posterior al análisis cuando AUTO_RENDER_ENABLED=true
 - Análisis opcional con faster-whisper (transcripción local)
 - Selector preliminar de fragmentos a partir de transcripciones; **es heurístico, no predictor de viralidad**
 - Generación de subtítulos SRT como archivo adjunto y comando opcional para incrustarlos en video
@@ -52,7 +52,7 @@ docker compose exec web python -m scripts.analyze_source SOURCE_ID --model small
 docker compose exec web python -m scripts.export_subtitles CLIP_ID
 ```
 
-Usa `INSTALL_AI=true` antes de construir Docker si quieres incluir Whisper y `AI_ENABLED=true` solo después de instalar correctamente los modelos.
+Usa `INSTALL_AI=true` antes de construir Docker si quieres incluir Whisper y `AI_ENABLED=true` solo después de instalar correctamente los modelos. Ajusta `AUTO_RENDER_ENABLED=true` para producir automáticamente los clips que el análisis seleccione; puede consumir bastante CPU/GPU.
 
 La transcripción puede consumir memoria/CPU considerable, y la primera ejecución del modelo puede requerir una descarga. Los subtítulos se generan como archivos SRT. Para crear un nuevo MP4 subtitulado, utiliza `docker compose exec web python -m scripts.burn_clip_subtitles CLIP_ID`. Requiere el filtro `subtitles` de FFmpeg. No se aplica automáticamente a cada clip.
 

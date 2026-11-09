@@ -29,4 +29,23 @@ def analyze_source_task(source_id: int):
     from .services.analyzer import analyze_source
     app = create_app()
     with app.app_context():
-        return analyze_source(source_id)
+        result = analyze_source(source_id)
+        if app.config.get("AUTO_RENDER_ENABLED"):
+            from .models import db, Clip
+            from .services.clip_processor import process_clip
+            successes = []
+            failures = []
+            for clip_id in result["clip_ids"]:
+                clip = db.session.get(Clip, clip_id)
+                if clip and clip.editorial_status == "ready":
+                    successes.append(clip_id)
+                    continue
+                try:
+                    process_clip(clip_id)
+                    successes.append(clip_id)
+                except Exception:
+                    # process_clip persists a failed state. Do not abort other candidates.
+                    failures.append(clip_id)
+            result["rendered_clip_ids"] = successes
+            result["failed_clip_ids"] = failures
+        return result

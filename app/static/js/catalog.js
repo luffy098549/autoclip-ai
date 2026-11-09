@@ -60,7 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
             btn.disabled=true;btn.textContent="Encolando…";
             try{
               const result=await send("/api/sources/"+item.id+"/analyze",{});
-              message("source-feedback",result.message);
+              message("source-feedback",result.message+" · ID de tarea: "+result.task_id);
             }catch(err){message("source-feedback",err.message,true);}
             finally{btn.disabled=false;btn.textContent="Analizar con IA";}
           });
@@ -125,6 +125,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     loadStreamers().catch(err=>message("source-feedback",err.message,true));
     loadClips().catch(err=>message("clip-feedback",err.message,true));
+    window.setInterval(()=>{
+      if(document.visibilityState==="visible")loadClips().catch(()=>{});
+    },15000);
   }
   const clip=document.getElementById("clip-form");
   if(clip){

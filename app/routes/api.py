@@ -23,6 +23,7 @@ def status():
         publishing_enabled=False,
         ingestion_enabled=True,
         ai_detection_enabled=bool(current_app.config.get("AI_ENABLED")),
+        auto_render_enabled=bool(current_app.config.get("AUTO_RENDER_ENABLED")),
         platforms=list(PLATFORMS),
         interval_minutes=int(MIN_INTERVAL.total_seconds() / 60),
         daily_limit_per_platform=MAX_PER_DAY,
@@ -260,3 +261,22 @@ def analytics_metrics():
     db.session.add(metric)
     db.session.commit()
     return jsonify(id=metric.id, message="Métricas guardadas como registro manual"), 201
+
+
+@api_bp.get("/jobs/<task_id>")
+@admin_only
+def job_status(task_id):
+    # This is an owner-only status view, not a general Redis task inspector.
+    try:
+        uuid.UUID(task_id)
+    except (ValueError, TypeError):
+        return jsonify(error="Invalid job identifier"), 400
+    from ..tasks import celery_app
+    task = celery_app.AsyncResult(task_id)
+    state = task.state
+    response = {"task_id": task_id, "state": state}
+    if state == "SUCCESS" and isinstance(task.result, dict):
+        response["result"] = task.result
+    elif state == "FAILURE":
+        response["error"] = "La tarea falló. Consulta los registros del worker."
+    return jsonify(response)

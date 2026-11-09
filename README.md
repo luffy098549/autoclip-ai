@@ -22,7 +22,8 @@ Automatización de edición de videos cortos **con material propio o autorizado*
 - Reproductor privado de clips 9:16, con filtros por estado y descargas MP4/SRT
 - Calendario privado de borradores con cancelación, límites de 120 minutos y máximo 5 por red/día; sin uploads reales
 - Registro manual de métricas de clips de tus propias cuentas, gráficos por red y ranking descriptivo por visualizaciones (sin ingresos estimados)
-- Pruebas automatizadas con GitHub Actions
+- Integraciones oficiales condicionadas a OAuth: YouTube mediante CLI manual; Instagram Reels en dos fases; TikTok con borrador en la bandeja de entrada
+- Pruebas de SDK sociales simuladas, PostgreSQL y frontend en GitHub Actions
 
 ## NO implementado todavía
 

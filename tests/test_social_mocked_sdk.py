@@ -1,6 +1,7 @@
 """Integration tests for the installed YouTube client SDK, without network access."""
-from pathlib import Path
+import pytest
 
+pytest.importorskip("googleapiclient")
 from app.publishers.youtube import upload_short
 
 

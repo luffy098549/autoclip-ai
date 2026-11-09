@@ -49,10 +49,12 @@ def test_processes_multiple_clips_and_continues_after_single_failure(capsys):
               "transcript_segments": 12, "candidate_count": 3, "clip_ids": [1, 2, 3]
           }) as analyze,
           patch.object(pipeline_full.db.session, "get", side_effect=lambda model, clip_id: clips[clip_id]),
+          patch.object(pipeline_full.db.session, "rollback") as rollback,
           patch.object(pipeline_full, "process_clip", side_effect=render) as process):
         with pytest.raises(SystemExit) as error:
             pipeline_full.main()
         assert error.value.code == 1
+    rollback.assert_called_once_with()
     create.assert_called_once_with({"AUTO_CAPTION_ENABLED": False})
     analyze.assert_called_once_with(42, model_size="small", max_clips=3)
     assert [call.args[0] for call in process.call_args_list] == [1, 2]

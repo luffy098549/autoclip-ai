@@ -11,7 +11,7 @@
 7. Open `http://localhost:8000/login` and sign in.
 8. Register a channel in Streamers, then upload a **licensed or owned** video in Clips.
 9. In Clips, create a recut request with start and end seconds.
-10. Until worker processing is enabled, run `docker compose exec web python -m scripts.process_clip CLIP_ID` (replace ID with the number shown).
+10. With Docker, PROCESSING_ENABLED=true sends work to the Celery worker automatically. If it is disabled or unavailable, run `docker compose exec web python -m scripts.process_clip CLIP_ID` (replace ID with the number shown).
 11. Inspect rendered clips in `storage/clips/`. Online publishing is deliberately disabled.
 
 ## Before using any public internet hosting

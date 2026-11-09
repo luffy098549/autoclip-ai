@@ -69,6 +69,16 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     } catch (e) { /* Other catalog operations remain available. */ }
     drawList("clip-list",clips.items,item=>"Fuente "+item.source_id+" · "+item.start+"–"+item.end+" s · "+item.status);
+    document.querySelectorAll("#clip-list .data-row").forEach((row,index)=>{
+      const item=clips.items[index];
+      if(item && item.status==="ready"){
+        const link=document.createElement("a");
+        link.className="button ghost";
+        link.href="/api/clips/"+item.id+"/download";
+        link.textContent="Descargar MP4";
+        row.append(link);
+      }
+    });
     const sel=document.getElementById("clip-source");
     if(sel){const previous=sel.value;sel.replaceChildren();addOption(sel,"","Selecciona una fuente");sources.items.forEach(item=>addOption(sel,item.id,"Fuente "+item.id+" · "+item.name));sel.value=previous;}
   }

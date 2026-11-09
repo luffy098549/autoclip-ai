@@ -17,7 +17,7 @@
   <label>Inicio (segundos)<input type="number" min="0" step="0.1" name="start" value="0" required></label>
   <label>Final (segundos)<input type="number" min="0.1" step="0.1" name="end" value="30" required></label>
   <button class="button" type="submit">Crear tarea de recorte</button>
-</form><p class="smallprint">Si Celery no está disponible, la tarea quedará en espera y podrá procesarse con el comando de administración.</p>
+</form><p class="smallprint">Con Docker y PROCESSING_ENABLED=true, Celery editará el clip automáticamente. Si el worker falla, el clip quedará en espera para procesarlo manualmente.</p>
 <div id="clip-feedback" class="form-feedback" aria-live="polite"></div></section>
 <section class="panel"><h2>Mis fuentes</h2><div id="source-list" class="data-list"></div></section>
 <section class="panel"><h2>Biblioteca de clips</h2><div id="clip-list" class="data-list"></div></section>

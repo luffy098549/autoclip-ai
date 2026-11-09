@@ -2,7 +2,7 @@
 import uuid
 from pathlib import Path
 from subprocess import CalledProcessError, TimeoutExpired
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, jsonify, request, send_file
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from werkzeug.utils import secure_filename
@@ -178,3 +178,17 @@ def analyze_source_request(source_id):
     except Exception:
         return jsonify(error="Worker o Redis no disponible"), 503
     return jsonify(task_id=task.id, message="Análisis de transcripción enviado al worker"), 202
+
+
+@api_bp.get("/clips/<int:clip_id>/download")
+@admin_only
+def download_clip(clip_id):
+    clip = db.session.get(Clip, clip_id)
+    if not clip or clip.editorial_status != "ready" or not clip.output_path:
+        return jsonify(error="Clip no disponible para descarga"), 404
+    allowed = (Path(current_app.config["MEDIA_ROOT"]) / "clips").resolve()
+    path = Path(clip.output_path).resolve()
+    if path.parent != allowed or not path.is_file():
+        return jsonify(error="Archivo de clip no disponible"), 404
+    return send_file(path, as_attachment=True, download_name=f"autoclip-{clip.id}.mp4",
+                     mimetype="video/mp4")

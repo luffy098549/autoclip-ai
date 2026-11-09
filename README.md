@@ -16,6 +16,7 @@ Automatización de edición de videos cortos **con material propio o autorizado*
 - Análisis opcional con faster-whisper (transcripción local)
 - Selector preliminar de fragmentos a partir de transcripciones; **es heurístico, no predictor de viralidad**
 - Generación de subtítulos SRT como archivo adjunto y comando opcional para incrustarlos en video
+- Reproductor privado de clips 9:16, con filtros por estado y descargas MP4/SRT
 - Calendario privado de borradores con cancelación, límites de 120 minutos y máximo 5 por red/día; sin uploads reales
 - Registro manual de métricas de clips publicados desde tus propias cuentas, con cálculo de interacción
 - Pruebas automatizadas con GitHub Actions

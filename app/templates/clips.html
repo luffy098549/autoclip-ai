@@ -20,7 +20,17 @@
 </form><p class="smallprint">Con Docker y PROCESSING_ENABLED=true, Celery editará el clip automáticamente. Si el worker falla, el clip quedará en espera para procesarlo manualmente.</p>
 <div id="clip-feedback" class="form-feedback" aria-live="polite"></div></section>
 <section class="panel"><h2>Mis fuentes</h2><div id="source-list" class="data-list"></div></section>
-<section class="panel"><h2>Biblioteca de clips</h2><div id="clip-list" class="data-list"></div></section>
+<section class="panel">
+  <div class="section-heading"><h2>Biblioteca de clips</h2><span class="tag">Vista previa privada</span></div>
+  <div class="library-toolbar">
+    <label>Buscar clip o fuente<input id="library-search" placeholder="ID del clip"></label>
+    <label>Estado<select id="library-filter"><option value="">Todos</option><option value="ready">Listos</option><option value="processing">Procesando</option><option value="queued">En cola</option><option value="awaiting_worker">En espera</option><option value="failed">Fallidos</option></select></label>
+    <button class="button ghost" type="button" id="library-refresh">Actualizar</button>
+    <span class="library-count" id="library-count" aria-live="polite">Cargando…</span>
+  </div>
+  <div id="clip-gallery" class="clip-gallery" aria-live="polite"></div>
+</section>
+<section class="panel"><h3>Estado detallado</h3><div id="clip-list" class="data-list"></div></section>
 {% else %}
 <section class="panel"><h2>Biblioteca de clips</h2><p class="muted">Inicia sesión como administrador para importar material y preparar videos.</p><a class="button" href="{{ url_for('auth.login') }}">Iniciar sesión</a></section>
 {% endif %}

@@ -137,3 +137,23 @@ def test_duplicate_clip_ids_are_rendered_only_once(capsys):
     output = capsys.readouterr().out
     assert "Skipping duplicate clip: 7" in output
     assert "Pipeline summary: rendered=2, already_ready=0, failed=0" in output
+
+
+def test_render_quota_is_enforced_when_analyzer_returns_extra_ids(capsys):
+    fake_app = SimpleNamespace(app_context=lambda: _Context())
+    with (patch.object(sys, "argv", ["pipeline_full", "42", "--max-clips", "2"]),
+          patch.object(pipeline_full, "create_app", return_value=fake_app),
+          patch.object(pipeline_full, "analyze_source", return_value={
+              "transcript_segments": 4, "candidate_count": 4,
+              "clip_ids": [7, 7, 8, 9, 10]
+          }),
+          patch.object(pipeline_full.db.session, "get",
+                       return_value=SimpleNamespace(editorial_status="pending")) as lookup,
+          patch.object(pipeline_full, "process_clip",
+                       return_value={"path": "clip.mp4"}) as render):
+        pipeline_full.main()
+    assert [call.args[1] for call in lookup.call_args_list] == [7, 8]
+    assert [call.args[0] for call in render.call_args_list] == [7, 8]
+    output = capsys.readouterr().out
+    assert "Clip quota reached" in output
+    assert "Pipeline summary: rendered=2, already_ready=0, failed=0" in output

@@ -21,7 +21,7 @@ def status():
     return jsonify(
         project="AutoClip AI", version="0.3.0",
         publishing_enabled=False,
-        ingestion_enabled=True,
+        ingestion_enabled=not current_app.config.get("READ_ONLY_DEPLOYMENT", False),
         ai_detection_enabled=bool(current_app.config.get("AI_ENABLED")),
         auto_render_enabled=bool(current_app.config.get("AUTO_RENDER_ENABLED")),
         youtube_metadata_enabled=bool(current_app.config.get("MONITORING_ENABLED")),
@@ -29,7 +29,7 @@ def status():
         interval_minutes=int(MIN_INTERVAL.total_seconds() / 60),
         daily_limit_per_platform=MAX_PER_DAY,
         timezone=str(TIMEZONE),
-        note="Local authorized media upload and clip queue only. No social uploads.",
+        note="Modo demostración solo lectura." if current_app.config.get("READ_ONLY_DEPLOYMENT") else "Local authorized media upload and clip queue only. No social uploads.",
     )
 
 

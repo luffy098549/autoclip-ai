@@ -1,0 +1,43 @@
+# Demo-only infrastructure: no shared durable media storage and no publishing workers.
+# Deploy from Render Dashboard -> New -> Blueprint. Review service pricing before approval.
+services:
+  - type: web
+    name: autoclip-ai-demo
+    runtime: docker
+    plan: free
+    region: virginia
+    repo: https://github.com/luffy098549/autoclip-ai
+    branch: main
+    autoDeployTrigger: checksPass
+    healthCheckPath: /health
+    dockerfilePath: ./Dockerfile
+    dockerCommand: sh -c "python -m scripts.init_db && exec gunicorn -b 0.0.0.0:8000 run:app"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: autoclip-ai-demo-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: SESSION_COOKIE_SECURE
+        value: "true"
+      - key: READ_ONLY_DEPLOYMENT
+        value: "true"
+      - key: PROCESSING_ENABLED
+        value: "false"
+      - key: AI_ENABLED
+        value: "false"
+      - key: AUTO_RENDER_ENABLED
+        value: "false"
+      - key: MONITORING_ENABLED
+        value: "false"
+      - key: PUBLISHING_ENABLED
+        value: "false"
+      - key: MEDIA_ROOT
+        value: /tmp/autoclip
+databases:
+  - name: autoclip-ai-demo-db
+    databaseName: autoclip
+    plan: free
+    region: virginia
+    postgresMajorVersion: "16"

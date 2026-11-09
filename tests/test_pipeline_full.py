@@ -12,6 +12,13 @@ import pytest
 from scripts import pipeline_full
 
 
+@pytest.fixture(autouse=True)
+def mock_daily_review_reservation():
+    # Existing CLI tests isolate rendering; quota behavior is tested separately.
+    with patch.object(pipeline_full, "reserve_review_slot", return_value=1):
+        yield
+
+
 @pytest.mark.parametrize("value", ["0", "-1"])
 def test_rejects_invalid_source_id_before_starting_pipeline(value):
     with patch.object(sys, "argv", ["pipeline_full", value]):
@@ -223,3 +230,22 @@ def test_pipeline_does_not_rerender_approved_published_or_processing_clips(capsy
     assert "Already rendered: 2" in output
     assert "Skipping clip already processing: 3" in output
     assert "Pipeline summary: rendered=1, already_ready=2, failed=0" in output
+
+
+def test_daily_quota_prevents_rendering_without_consuming_batch_limit(capsys):
+    fake_app = SimpleNamespace(app_context=lambda: _Context())
+    clips = {1: SimpleNamespace(editorial_status="pending"),
+             2: SimpleNamespace(editorial_status="pending"),
+             3: SimpleNamespace(editorial_status="pending")}
+    with (patch.object(sys, "argv", ["pipeline_full", "42", "--max-clips", "2"]),
+          patch.object(pipeline_full, "create_app", return_value=fake_app),
+          patch.object(pipeline_full, "analyze_source", return_value={
+              "transcript_segments": 3, "candidate_count": 3, "clip_ids": [1, 2, 3]
+          }),
+          patch.object(pipeline_full.db.session, "get", side_effect=lambda model, cid: clips[cid]),
+          patch.object(pipeline_full, "reserve_review_slot", side_effect=[None, 1, 2]) as reserve,
+          patch.object(pipeline_full, "process_clip", return_value={"path": "synthetic.mp4"}) as render):
+        pipeline_full.main()
+    assert [call.args[0] for call in reserve.call_args_list] == [1, 2, 3]
+    assert [call.args[0] for call in render.call_args_list] == [2, 3]
+    assert "Daily review quota reached; skipping clip: 1" in capsys.readouterr().out

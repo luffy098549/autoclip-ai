@@ -1,6 +1,20 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="panel"><div class="section-heading"><h2>Rendimiento y experimentos</h2><span class="tag">Próxima fase</span></div><p class="muted">Se analizarán las estadísticas de tus propias cuentas conectadas, sin inventar ingresos ni acceder a métricas privadas de otros canales.</p>
-<div class="empty"><span class="empty-icon">▥</span><h3>Aún no hay métricas</h3><p>En el futuro: vistas, retención, seguidores, compartidos y rendimiento por formato.</p></div>
-</section>
+{% if session.get('admin_authenticated') %}
+<section class="panel"><div class="section-heading"><h2>Registrar métricas reales</h2><span class="tag">Carga manual inicial</span></div>
+<p class="muted">Introduce únicamente las cifras verificadas en tus propias cuentas. El conector con las APIs de analíticas será una fase posterior.</p>
+<form id="metric-form" class="editor-form">
+  <label>Clip<select name="clip_id" id="metric-clip" required><option value="">Selecciona un clip</option></select></label>
+  <label>Plataforma<select name="platform"><option value="youtube">YouTube Shorts</option><option value="tiktok">TikTok</option><option value="instagram">Instagram Reels</option></select></label>
+  <label>Visualizaciones<input name="views" type="number" min="0" value="0" required></label>
+  <label>Me gusta<input name="likes" type="number" min="0" value="0" required></label>
+  <label>Comentarios<input name="comments" type="number" min="0" value="0" required></label>
+  <label>Compartidos<input name="shares" type="number" min="0" value="0" required></label>
+  <label>Tiempo promedio visto (segundos, opcional)<input name="avg_watch_seconds" type="number" min="0" step="0.1"></label>
+  <button class="button" type="submit">Guardar estadísticas</button>
+</form><div id="metric-feedback" class="form-feedback" aria-live="polite"></div></section>
+<section class="panel"><h2>Últimas métricas por clip y red</h2><p class="smallprint" id="analytics-totals">Consultando…</p><div id="analytics-list" class="data-list"></div><p class="smallprint">La interacción se calcula como (likes + comentarios + compartidos) / visualizaciones. Es una aproximación descriptiva, no un cálculo de ingresos ni una predicción de viralidad.</p></section>
+{% else %}
+<section class="panel"><h2>Analíticas privadas</h2><p class="muted">Inicia sesión para consultar y registrar datos de tus propias cuentas.</p><a class="button" href="{{ url_for('auth.login') }}">Iniciar sesión</a></section>
+{% endif %}
 {% endblock %}

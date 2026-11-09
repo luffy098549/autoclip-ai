@@ -89,6 +89,24 @@ document.addEventListener("DOMContentLoaded", () => {
     const sel=document.getElementById("clip-source");
     if(sel){const previous=sel.value;sel.replaceChildren();addOption(sel,"","Selecciona una fuente");sources.items.forEach(item=>addOption(sel,item.id,"Fuente "+item.id+" · "+item.name));sel.value=previous;}
   }
+  async function loadAnalytics(){
+    const clipData=await get("/api/clips");
+    const data=await get("/api/analytics");
+    const selector=document.getElementById("metric-clip");
+    if(selector){const prev=selector.value;selector.replaceChildren();addOption(selector,"","Selecciona un clip");clipData.items.forEach(item=>addOption(selector,item.id,"Clip "+item.id+" · "+item.status));selector.value=prev;}
+    const stats=document.getElementById("analytics-totals");
+    if(stats) stats.textContent="Vistas registradas: "+data.summary.views.toLocaleString("es")+" · Likes: "+data.summary.likes.toLocaleString("es")+" · Compartidos: "+data.summary.shares.toLocaleString("es");
+    drawList("analytics-list",data.items,item=>"Clip "+item.clip_id+" · "+item.platform+" · "+item.views.toLocaleString("es")+" vistas · "+item.engagement_percent+"% interacción");
+  }
+  const analyticsForm=document.getElementById("metric-form");
+  if(analyticsForm){
+    analyticsForm.addEventListener("submit",async e=>{
+      e.preventDefault();
+      try{const result=await send("/api/analytics",Object.fromEntries(new FormData(analyticsForm).entries()));message("metric-feedback",result.message);await loadAnalytics();}
+      catch(err){message("metric-feedback",err.message,true);}
+    });
+    loadAnalytics().catch(err=>message("metric-feedback",err.message,true));
+  }
   const streamer=document.getElementById("streamer-form");
   if(streamer){
     streamer.addEventListener("submit",async e=>{

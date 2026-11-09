@@ -6,7 +6,7 @@ from flask import Blueprint, current_app, jsonify, request, send_file
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from werkzeug.utils import secure_filename
-from ..models import db, Streamer, MediaSource, Clip, Publication
+from ..models import db, Streamer, MediaSource, Clip, Publication, PerformanceMetric
 from ..scheduler import MAX_PER_DAY, MIN_INTERVAL, PLATFORMS, TIMEZONE
 from ..quality import inspect_video, MediaValidationError
 from ..security import admin_only
@@ -206,3 +206,57 @@ def download_subtitles(clip_id):
         return jsonify(error="Subtítulos no disponibles"), 404
     return send_file(path, as_attachment=True, download_name=f"autoclip-{clip.id}.srt",
                      mimetype="application/x-subrip")
+
+
+@api_bp.route("/analytics", methods=["GET", "POST"])
+@admin_only
+def analytics_metrics():
+    if request.method == "GET":
+        snapshots = PerformanceMetric.query.order_by(
+            PerformanceMetric.recorded_at.desc(), PerformanceMetric.id.desc()
+        ).limit(1000).all()
+        latest = {}
+        for item in snapshots:
+            latest.setdefault((item.clip_id, item.platform), item)
+        items = list(latest.values())[:100]
+        from ..analytics.metrics import engagement_percent
+        payload = [{
+            "id": item.id, "clip_id": item.clip_id, "platform": item.platform,
+            "views": item.views, "likes": item.likes, "comments": item.comments,
+            "shares": item.shares, "avg_watch_seconds": item.avg_watch_seconds,
+            "engagement_percent": engagement_percent(item.views, item.likes, item.comments, item.shares),
+            "recorded_at": item.recorded_at.isoformat(),
+        } for item in items]
+        return jsonify(items=payload,
+                       summary={"views": sum(i.views for i in items),
+                                "likes": sum(i.likes for i in items),
+                                "shares": sum(i.shares for i in items),
+                                "tracked_clips": len({i.clip_id for i in items})},
+                       note="Manual snapshots from owned accounts, not platform API data.")
+    data = request.get_json(silent=True) or {}
+    try:
+        clip_id = int(data.get("clip_id"))
+        platform = str(data.get("platform", "")).strip().lower()
+        views = int(data.get("views", 0))
+        likes = int(data.get("likes", 0))
+        comments = int(data.get("comments", 0))
+        shares = int(data.get("shares", 0))
+        raw_watch = data.get("avg_watch_seconds")
+        avg_watch = float(raw_watch) if raw_watch not in ("", None) else None
+    except (TypeError, ValueError, OverflowError):
+        return jsonify(error="Revisa las cifras enviadas"), 400
+    if not db.session.get(Clip, clip_id):
+        return jsonify(error="Clip inexistente"), 404
+    if platform not in PLATFORMS:
+        return jsonify(error="Plataforma inválida"), 400
+    figures = (views, likes, comments, shares)
+    if any(n < 0 or n > 1_000_000_000_000 for n in figures):
+        return jsonify(error="Las cifras deben ser positivas y razonables"), 400
+    if avg_watch is not None and not (0 <= avg_watch <= 100_000):
+        return jsonify(error="Tiempo de visualización inválido"), 400
+    metric = PerformanceMetric(clip_id=clip_id, platform=platform, views=views,
+                               likes=likes, comments=comments, shares=shares,
+                               avg_watch_seconds=avg_watch)
+    db.session.add(metric)
+    db.session.commit()
+    return jsonify(id=metric.id, message="Métricas guardadas como registro manual"), 201

@@ -51,3 +51,15 @@ class TranscriptSegment(db.Model):
     end_seconds = db.Column(db.Float, nullable=False)
     text = db.Column(db.Text, nullable=False)
     language = db.Column(db.String(20), nullable=True)
+
+class PerformanceMetric(db.Model):
+    __tablename__ = "performance_metrics"
+    id = db.Column(db.Integer, primary_key=True)
+    clip_id = db.Column(db.Integer, db.ForeignKey("clips.id"), nullable=False, index=True)
+    platform = db.Column(db.String(30), nullable=False)
+    views = db.Column(db.BigInteger, default=0, nullable=False)
+    likes = db.Column(db.BigInteger, default=0, nullable=False)
+    comments = db.Column(db.BigInteger, default=0, nullable=False)
+    shares = db.Column(db.BigInteger, default=0, nullable=False)
+    avg_watch_seconds = db.Column(db.Float)
+    recorded_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)

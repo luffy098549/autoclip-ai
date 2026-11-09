@@ -16,6 +16,7 @@ Automatización de edición de videos cortos **con material propio o autorizado*
 - Selector preliminar de fragmentos a partir de transcripciones; **es heurístico, no predictor de viralidad**
 - Generación de subtítulos SRT como archivo adjunto y comando opcional para incrustarlos en video
 - Límite de planificación: al menos 120 minutos entre publicaciones y máximo 5 por red/día
+- Registro manual de métricas de clips publicados desde tus propias cuentas, con cálculo de interacción
 - Pruebas automatizadas con GitHub Actions
 
 ## NO implementado todavía

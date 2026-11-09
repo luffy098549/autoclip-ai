@@ -1,60 +1,64 @@
-# AutoClip AI
+# AutoClip AI — MVP en desarrollo
 
-A Python-based starter platform for producing **authorized, original** short-form video content.
+Automatización de edición de videos cortos **con material propio o autorizado**.
 
-## Implemented
-- Flask HTTP health and status endpoints
-- PostgreSQL/SQLAlchemy source, creator, clip and publication data models
-- Redis/Celery worker and beat scaffolding
-- Deterministic 120-minute minimum separation and 5-publication daily maximum per platform
-- Local FFmpeg 1080x1920 render from an authorized input video
-- ffprobe source inspection + output quality validation
-- Command-line preview workflow and unit tests
-- Docker Compose for local development
+[![Python checks](https://github.com/luffy098549/autoclip-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/luffy098549/autoclip-ai/actions)
 
-## Not yet implemented
-Automated Kick/YouTube downloads, AI highlight selection, speech-to-text,
-automatic subtitles, official YouTube/TikTok/Instagram OAuth and uploads,
-analytics, production scheduling with transactional database locks, rights
-verification beyond explicit user attestation, and a complete dashboard.
-**No social media uploads happen in this version.**
+## Implementado
 
-## Setup
-1. Install Docker and Docker Compose, or Python 3.12+ and FFmpeg.
-2. Copy `.env.example` to `.env`; set your own secret and DB password. Do not commit `.env`.
-3. Run `docker compose up --build -d`.
-4. Run `docker compose exec web python -m scripts.init_db`.
-5. Open `http://localhost:8000/health` and `http://localhost:8000/api/status`.
+- Panel web responsive: Dashboard, Streamers, Clips, Publicaciones, Analíticas y Configuración
+- Inicio de sesión del propietario (contraseña con hash), sesiones y protección CSRF
+- Registro de canales de Kick/YouTube **sin descargar videos automáticamente**
+- Carga de videos propios/autorizados y registro de fuentes en PostgreSQL
+- Solicitudes de recorte y renderizado vertical 1080×1920 con FFmpeg
+- Cola Celery/Redis para procesamiento opcional
+- Análisis opcional con faster-whisper (transcripción local)
+- Selector preliminar de fragmentos a partir de transcripciones; **es heurístico, no predictor de viralidad**
+- Generación de subtítulos SRT como archivo adjunto
+- Límite de planificación: al menos 120 minutos entre publicaciones y máximo 5 por red/día
+- Pruebas automatizadas con GitHub Actions
 
-### Local video proof of concept
-For development outside Docker, install dependencies from `requirements.txt`
-and ensure `ffmpeg` and `ffprobe` are available on PATH.
+## NO implementado todavía
+
+- Descarga de directos de terceros, monitoreo en vivo de Kick o YouTube
+- Permisos de acceso/OAuth a cuentas de YouTube, TikTok o Instagram
+- Publicación real de videos o monetización
+- Reencuadre de rostros mediante IA, subtítulos incrustados en video, narración original automática
+- Análisis de rendimiento con métricas de cuentas conectadas
+- Motor de publicaciones transaccional, migraciones de producción y seguridad de despliegue público
+
+**Ningún video se publica automáticamente en redes en esta versión.**
+
+## Desarrollo local
+
+1. Copia `.env.example` a `.env`. Sustituye SECRET_KEY por una cadena aleatoria.
+2. Ejecuta `python -m scripts.hash_password` en un entorno con las dependencias instaladas. Copia el hash generado a `ADMIN_PASSWORD_HASH` en `.env` (no publiques la contraseña).
+3. Ejecuta `docker compose up --build -d`.
+4. Crea las tablas: `docker compose exec web python -m scripts.init_db`.
+5. Abre `http://localhost:8000/login` e inicia sesión.
+6. En **Streamers**, registra el canal; en **Clips**, carga un video autorizado.
+7. Elige inicio/final y crea la tarea. Procesa manualmente con `docker compose exec web python -m scripts.process_clip ID` si no activaste workers.
+8. Los videos exportados se guardan en `storage/clips/`.
+
+Más detalles en [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+
+### Análisis con IA opcional
+
+Para pruebas locales, instala `requirements-ai.txt` que incluye `faster-whisper` y sigue las instrucciones de Docker:
 
 ```bash
-python -m scripts.clip_local input.mp4 output.mp4 --start 10 --end 35 --authorized
-python -m pytest -q
+docker compose exec web python -m scripts.analyze_source SOURCE_ID --model small --max-clips 5 --render
+docker compose exec web python -m scripts.export_subtitles CLIP_ID
 ```
 
-The `--authorized` flag is your explicit confirmation that you have the rights to
-edit the supplied video. It is not a legal verification mechanism. Do not
-upload or repost footage unless permission and platform eligibility are established.
+Usa `INSTALL_AI=true` antes de construir Docker si quieres incluir Whisper y `AI_ENABLED=true` solo después de instalar correctamente los modelos.
 
-## Publishing configuration
-Initial targets: YouTube Shorts, TikTok and Instagram Reels.
-- Minimum separation per platform: **120 minutes**
-- Maximum per platform per New York calendar day: **5**
-- Example daily slots: 10:00, 12:00, 14:00, 16:00, 18:00 America/New_York
-- Actual publishing remains disabled until official integrations are implemented.
+La transcripción puede consumir memoria/CPU considerable, y la primera ejecución del modelo puede requerir una descarga. Los subtítulos se generan como archivos SRT; **todavía no están incrustados en el MP4**.
 
-## Security
-Never commit API keys, OAuth tokens, user credentials, personal media or
-private recordings. The repo is public. All social account authentication
-must use official OAuth and secrets must remain server-side.
+## Reglas comerciales y derechos
 
-## Development roadmap
-1. Local media pipeline and robust validation
-2. Authorized media import and persistent jobs
-3. Whisper transcription and highlight scoring
-4. Automatic subtitles, audio processing and editable templates
-5. Platform authorization, rate limits, publication and verification
-6. Analytics, experiments, alerts and production deployment
+El proyecto busca construir canales propios de Shorts, Reels y TikTok, no ofrecer un servicio a terceros. La publicación y monetización dependen de permisos de reutilización, contenido original y normas vigentes de cada plataforma. Declarar derechos en un formulario **no constituye una verificación legal independiente**.
+
+## Seguridad
+
+El repositorio es público: nunca subas `.env`, contraseñas, OAuth tokens, videos privados ni claves. Docker expone el panel solo en `127.0.0.1` para desarrollo. Antes de desplegar públicamente se necesitan HTTPS, gestión de secretos, límites de intentos, autenticación reforzada y migraciones de base de datos.

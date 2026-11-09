@@ -1,18 +1,22 @@
+x-autoclip-build: &autoclip-build
+  context: .
+  args:
+    INSTALL_AI: ${INSTALL_AI:-false}
 services:
   web:
-    build: .
+    build: *autoclip-build
     env_file: .env
-    ports: ["8000:8000"]
+    ports: ["127.0.0.1:8000:8000"]
     volumes: ["./storage:/app/storage"]
     depends_on: [db, redis]
   worker:
-    build: .
+    build: *autoclip-build
     env_file: .env
     command: celery -A app.tasks.celery_app worker --loglevel=info
     volumes: ["./storage:/app/storage"]
     depends_on: [db, redis]
   beat:
-    build: .
+    build: *autoclip-build
     env_file: .env
     command: celery -A app.tasks.celery_app beat --loglevel=info
     depends_on: [db, redis]

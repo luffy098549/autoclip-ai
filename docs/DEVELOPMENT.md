@@ -28,3 +28,24 @@ python -m pytest -q
 Video validation uses ffprobe. Automatic render uses FFmpeg. Source permissions must be documented and confirmed by the owner. Flags and text fields are attestations, **not** independent legal verification.
 
 Publishing remains OFF; official API connections, original-content editorial checks, and OAuth are future stages.
+
+## Optional Whisper AI processing
+
+To build the optional AI image:
+
+1. Set `INSTALL_AI=true` in your shell environment before calling Docker Compose, or add it to the local `.env`.
+2. Set `AI_ENABLED=true` in your local `.env` (not in GitHub).
+3. Rebuild: `docker compose build --no-cache` and `docker compose up -d`.
+4. Initialize new tables: `docker compose exec web python -m scripts.init_db`.
+5. Run `docker compose exec web python -m scripts.analyze_source SOURCE_ID --render`.
+6. Inspect the created clips and sidecar SRT subtitles in your `storage/` directory.
+
+Automatic selection uses a preliminary timing-and-language heuristic based on Whisper.
+It does not guarantee viral clips, contextual accuracy or platform monetization.
+The published video must still be editorially reviewed.
+
+### Limitations
+
+- `AI_ENABLED` enables a Celery task endpoint but does not grant Kick, YouTube, TikTok or Instagram permissions.
+- `PROCESSING_ENABLED` only queues FFmpeg work; it **does not** enable social media uploads.
+- The repository has no production-ready database migration mechanism yet. The initial `create_all` is a development aid.

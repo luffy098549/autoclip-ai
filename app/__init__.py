@@ -26,6 +26,9 @@ def create_app(config=None):
     )
     if config:
         app.config.update(config)
+    if (app.config.get("ADMIN_PASSWORD_HASH") and
+            app.config["SECRET_KEY"] == "replace-with-unique-random-secret"):
+        raise RuntimeError("Set a strong SECRET_KEY before enabling admin login")
     db.init_app(app)
     csrf.init_app(app)
 

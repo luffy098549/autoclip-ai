@@ -46,6 +46,28 @@ document.addEventListener("DOMContentLoaded", () => {
     const sources=await get("/api/sources");
     const clips=await get("/api/clips");
     drawList("source-list",sources.items,item=>item.name+" · "+item.rights);
+    try {
+      const status=await get("/api/status");
+      if(status.ai_detection_enabled){
+        document.querySelectorAll("#source-list .data-row").forEach((row,index)=>{
+          const item=sources.items[index];
+          if(!item)return;
+          const btn=document.createElement("button");
+          btn.className="button ghost";
+          btn.type="button";
+          btn.textContent="Analizar con IA";
+          btn.addEventListener("click",async()=>{
+            btn.disabled=true;btn.textContent="Encolando…";
+            try{
+              const result=await send("/api/sources/"+item.id+"/analyze",{});
+              message("source-feedback",result.message);
+            }catch(err){message("source-feedback",err.message,true);}
+            finally{btn.disabled=false;btn.textContent="Analizar con IA";}
+          });
+          row.append(btn);
+        });
+      }
+    } catch (e) { /* Other catalog operations remain available. */ }
     drawList("clip-list",clips.items,item=>"Fuente "+item.source_id+" · "+item.start+"–"+item.end+" s · "+item.status);
     const sel=document.getElementById("clip-source");
     if(sel){const previous=sel.value;sel.replaceChildren();addOption(sel,"","Selecciona una fuente");sources.items.forEach(item=>addOption(sel,item.id,"Fuente "+item.id+" · "+item.name));sel.value=previous;}

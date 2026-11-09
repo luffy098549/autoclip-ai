@@ -105,10 +105,12 @@ def test_clip_lookup_error_does_not_stop_other_renders(capsys):
               "transcript_segments": 2, "candidate_count": 2, "clip_ids": [1, 2]
           }),
           patch.object(pipeline_full.db.session, "get", side_effect=lookup),
+          patch.object(pipeline_full.db.session, "rollback") as rollback,
           patch.object(pipeline_full, "process_clip", return_value={"path": "clip-2.mp4"}) as process):
         with pytest.raises(SystemExit) as error:
             pipeline_full.main()
         assert error.value.code == 1
+    rollback.assert_called_once_with()
     process.assert_called_once_with(2)
     output = capsys.readouterr().out
     assert "Clip 1 failed: RuntimeError" in output

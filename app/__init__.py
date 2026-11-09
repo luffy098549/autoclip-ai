@@ -66,6 +66,8 @@ def create_app(config=None):
     app.register_blueprint(system_bp, url_prefix="/api")
     from .routes.integrations import integrations_bp
     app.register_blueprint(integrations_bp, url_prefix="/api")
+    from .routes.review import review_bp
+    app.register_blueprint(review_bp, url_prefix="/api")
 
     @app.after_request
     def secure_browser_response(response):

@@ -40,7 +40,9 @@ def test_processes_multiple_clips_and_continues_after_single_failure(capsys):
           }) as analyze,
           patch.object(pipeline_full.db.session, "get", side_effect=lambda model, clip_id: clips[clip_id]),
           patch.object(pipeline_full, "process_clip", side_effect=render) as process):
-        pipeline_full.main()
+        with pytest.raises(SystemExit) as error:
+            pipeline_full.main()
+        assert error.value.code == 1
     create.assert_called_once_with({"AUTO_CAPTION_ENABLED": False})
     analyze.assert_called_once_with(42, model_size="small", max_clips=3)
     assert [call.args[0] for call in process.call_args_list] == [1, 2]
@@ -48,6 +50,7 @@ def test_processes_multiple_clips_and_continues_after_single_failure(capsys):
     assert "Clip 1 failed: RuntimeError" in output
     assert "Rendered clip: 2 synthetic-output.mp4" in output
     assert "Already rendered: 3" in output
+    assert "Pipeline summary: rendered=1, already_ready=1, failed=1" in output
     assert "Review every exported clip" in output
 
 

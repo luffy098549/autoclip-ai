@@ -1,7 +1,7 @@
 """Flask application factory for AutoClip AI."""
 import os
 import secrets
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_wtf.csrf import CSRFProtect
 from flask_migrate import Migrate
 from .models import db
@@ -46,6 +46,21 @@ def create_app(config=None):
     app.register_blueprint(planning_bp, url_prefix="/api")
     from .routes.previews import previews_bp
     app.register_blueprint(previews_bp, url_prefix="/api")
+    from .routes.system import system_bp
+    app.register_blueprint(system_bp, url_prefix="/api")
+
+    @app.after_request
+    def secure_browser_response(response):
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault("Content-Security-Policy",
+            "default-src 'self'; script-src 'self'; style-src 'self'; "
+            "img-src 'self' data:; media-src 'self'; connect-src 'self'; "
+            "frame-ancestors 'none'; form-action 'self'; base-uri 'none'")
+        if request.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "private, no-store"
+        return response
 
     @app.get("/health")
     def health():

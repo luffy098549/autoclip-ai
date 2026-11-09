@@ -11,10 +11,12 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/planning.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/library.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/system.css') }}">
   <script defer src="{{ url_for('static', filename='js/app.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/catalog.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/planning.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/library.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='js/system.js') }}"></script>
 </head>
 <body>
   <a href="#main" class="skip-link">Saltar al contenido</a>
@@ -29,7 +31,7 @@
         <a href="{{ url_for('dashboard.analytics') }}" class="{{ 'active' if request.path == '/analytics' else '' }}">▥ <span>Analíticas</span></a>
         <a href="{{ url_for('dashboard.settings') }}" class="{{ 'active' if request.path == '/settings' else '' }}">⚙ <span>Configuración</span></a>
       </nav>
-      <div class="sidebar-footer">Versión 0.4.0 <span class="status-pill">Modo desarrollo</span></div>
+      <div class="sidebar-footer">Versión 0.5.0 <span class="status-pill">Modo desarrollo</span></div>
     </aside>
     <div class="workspace">
       <header class="topbar">

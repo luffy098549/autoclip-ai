@@ -1,6 +1,27 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="panel"><div class="section-heading"><h2>Configuración actual</h2><span class="tag">Solo lectura</span></div>
-<div class="settings-list"><div><b>Intervalo entre publicaciones</b><span>120 minutos</span></div><div><b>Máximo diario por red</b><span>5 videos</span></div><div><b>Zona horaria</b><span>America/New_York</span></div><div><b>Redes</b><span>YouTube · TikTok · Instagram</span></div><div><b>Publicación automática</b><span class="status-pill">Desactivada</span></div><div><b>Importación automática</b><span class="status-pill">Desactivada</span></div></div>
-<p class="smallprint">Estas opciones se configurarán desde un panel protegido cuando exista autenticación. Nunca guardaremos tokens en el navegador ni en el repositorio público.</p></section>
+<section class="panel">
+  <div class="section-heading"><h2>Estado del sistema</h2><span class="tag">Configuración segura</span></div>
+  <p class="muted">AutoClip AI muestra las funciones disponibles sin exponer claves, contraseñas ni tokens. Las opciones sensibles se gestionan con variables de entorno privadas.</p>
+  {% if session.get('admin_authenticated') %}
+  <div id="system-health" class="system-health" role="status">Consultando los servicios…</div>
+  <div class="settings-list">
+    <div><b>Base de datos</b><span data-system="database">Comprobando…</span></div>
+    <div><b>Acceso del propietario</b><span data-system="owner_login">Comprobando…</span></div>
+    <div><b>Almacenamiento de videos</b><span data-system="storage">Comprobando…</span></div>
+    <div><b>Procesamiento FFmpeg con Celery</b><span data-system="processing">Comprobando…</span></div>
+    <div><b>Transcripción con IA</b><span data-system="ai">Comprobando…</span></div>
+    <div><b>Renderizado después del análisis</b><span data-system="auto_render">Comprobando…</span></div>
+    <div><b>Metadatos de YouTube</b><span data-system="monitoring">Comprobando…</span></div>
+    <div><b>Publicación automática</b><span data-system="publishing">Desactivada</span></div>
+    <div><b>Intervalo entre planes</b><span data-system="interval">120 minutos</span></div>
+    <div><b>Límite por red y día</b><span data-system="limit">5</span></div>
+    <div><b>Zona horaria</b><span data-system="timezone">America/New_York</span></div>
+  </div>
+  <p class="smallprint">La activación de una opción indica su configuración, no garantiza que el worker o una API de terceros estén operativos. El calendario de publicaciones sigue siendo local.</p>
+  {% else %}
+  <p class="muted">Los detalles de configuración solo se muestran al propietario.</p>
+  <a class="button" href="{{ url_for('auth.login') }}">Entrar al panel</a>
+  {% endif %}
+</section>
 {% endblock %}

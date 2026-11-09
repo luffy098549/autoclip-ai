@@ -7,6 +7,7 @@ Automatización de edición de videos cortos **con material propio o autorizado*
 ## Implementado
 
 - Panel web responsive: Dashboard, Streamers, Clips, Publicaciones, Analíticas y Configuración
+- Estado real de PostgreSQL y módulos del backend en la página de configuración; estadísticas de negocio privadas
 - Inicio de sesión del propietario (contraseña con hash), sesiones y protección CSRF
 - Registro de canales de Kick/YouTube **sin descargar videos automáticamente**
 - Consulta opcional de metadatos públicos de canales/videos con la API oficial de YouTube (requiere clave propia)

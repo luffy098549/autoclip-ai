@@ -4,21 +4,25 @@
   <div><p class="eyebrow accent">PRODUCCIÓN INTELIGENTE DE CONTENIDO</p><h2>Tu centro de operaciones para videos cortos</h2><p>Gestiona el flujo desde materiales autorizados hasta clips preparados para YouTube Shorts, TikTok e Instagram Reels.</p><div class="hero-links"><a class="button" href="{{ url_for('dashboard.clips') }}">Ver biblioteca</a><a class="button ghost" href="{{ url_for('dashboard.settings') }}">Ver configuración</a></div></div>
   <div class="hero-art" aria-hidden="true"><div class="play-icon">▶</div><span>AUTOCLIP / 9:16</span></div>
 </section>
-<section class="stat-grid" aria-label="Estadísticas de la base de datos">
+{% if session.get("admin_authenticated") %}
+<section class="stat-grid" aria-label="Estadísticas privadas de la base de datos">
   <div class="stat"><span>Streamers</span><strong data-stat="streamers">—</strong><small>Canales registrados</small></div>
   <div class="stat"><span>Fuentes</span><strong data-stat="sources">—</strong><small>Material de origen</small></div>
   <div class="stat"><span>Clips</span><strong data-stat="clips">—</strong><small>Ediciones registradas</small></div>
   <div class="stat"><span>Publicaciones</span><strong data-stat="publications">—</strong><small>Registros de distribución</small></div>
 </section>
+{% else %}
+<section class="panel" style=""><h3>Información privada</h3><p class="muted">Las estadísticas de tus canales se muestran únicamente después de iniciar sesión.</p><a class="button" href="{{ url_for('auth.login') }}">Entrar al dashboard</a></section>
+{% endif %}
 <div class="two-column">
   <section class="panel"><div class="section-heading"><h3>Flujo de producción</h3><span class="tag">Diseño por fases</span></div>
-    <ol class="steps"><li><b>Fuentes autorizadas</b><small>Verificación de derechos antes de procesar</small></li><li><b>Selección inteligente</b><small>Transcripción y puntuación: pendiente</small></li><li><b>Edición vertical</b><small>FFmpeg y control de calidad: base disponible</small></li><li><b>Programación</b><small>120 min y límite de cinco clips por red</small></li><li><b>Distribución</b><small>APIs oficiales: pendientes de integrar</small></li></ol>
+    <ol class="steps"><li><b>Fuentes autorizadas</b><small>Verificación de derechos antes de procesar</small></li><li><b>Selección inteligente</b><small>Whisper y puntuación heurística: activación opcional</small></li><li><b>Edición vertical</b><small>FFmpeg y control de calidad: base disponible</small></li><li><b>Planificación</b><small>Borradores privados: 120 minutos y cinco por red</small></li><li><b>Distribución</b><small>APIs oficiales: pendientes de integrar</small></li></ol>
   </section>
   <section class="panel"><div class="section-heading"><h3>Destinos</h3><span class="tag">3 redes</span></div>
     <div class="network"><span class="network-logo">▶</span><div><b>YouTube Shorts</b><small>Máximo 5 publicaciones al día</small></div><span class="tag muted">Sin conectar</span></div>
     <div class="network"><span class="network-logo">♪</span><div><b>TikTok</b><small>Máximo 5 publicaciones al día</small></div><span class="tag muted">Sin conectar</span></div>
     <div class="network"><span class="network-logo">◎</span><div><b>Instagram Reels</b><small>Máximo 5 publicaciones al día</small></div><span class="tag muted">Sin conectar</span></div>
-    <p class="smallprint" id="summary-message">Consultando estado de la base de datos…</p>
+    {% if session.get("admin_authenticated") %}<p class="smallprint" id="summary-message">Consultando estado de la base de datos…</p>{% endif %}
   </section>
 </div>
 {% endblock %}

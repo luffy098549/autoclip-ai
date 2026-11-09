@@ -1,0 +1,1 @@
+.system-health{padding:13px 15px;margin:15px 0;border:1px solid var(--border);border-radius:10px;background:var(--panel2);font-size:13px}.system-health.ok{border-color:#2f7062;color:var(--accent)}.system-health.error{border-color:#8a554c;color:#ffad9d}

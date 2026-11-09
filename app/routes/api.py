@@ -34,6 +34,7 @@ def status():
 
 
 @api_bp.get("/summary")
+@admin_only
 def summary():
     counts = {"streamers": 0, "sources": 0, "clips": 0, "publications": 0}
     models = {"streamers": Streamer, "sources": MediaSource, "clips": Clip, "publications": Publication}

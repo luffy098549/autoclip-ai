@@ -60,3 +60,22 @@ class _Context:
 
     def __exit__(self, exc_type, exc, tb):
         return False
+
+
+def test_missing_clip_does_not_prevent_rendering_other_candidates(capsys):
+    clips = {2: SimpleNamespace(editorial_status="pending")}
+    fake_app = SimpleNamespace(app_context=lambda: _Context())
+    with (patch.object(sys, "argv", ["pipeline_full", "42", "--max-clips", "2"]),
+          patch.object(pipeline_full, "create_app", return_value=fake_app),
+          patch.object(pipeline_full, "analyze_source", return_value={
+              "transcript_segments": 2, "candidate_count": 2, "clip_ids": [1, 2]
+          }),
+          patch.object(pipeline_full.db.session, "get", side_effect=lambda model, clip_id: clips.get(clip_id)),
+          patch.object(pipeline_full, "process_clip", return_value={"path": "clip-2.mp4"}) as process):
+        with pytest.raises(SystemExit) as error:
+            pipeline_full.main()
+        assert error.value.code == 1
+    process.assert_called_once_with(2)
+    output = capsys.readouterr().out
+    assert "Clip 1 failed: not found" in output
+    assert "Pipeline summary: rendered=1, already_ready=0, failed=1" in output

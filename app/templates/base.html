@@ -12,11 +12,13 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/planning.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/library.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/system.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/jobs.css') }}">
   <script defer src="{{ url_for('static', filename='js/app.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/catalog.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/planning.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/library.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/system.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='js/jobs.js') }}"></script>
 </head>
 <body>
   <a href="#main" class="skip-link">Saltar al contenido</a>
@@ -27,6 +29,7 @@
         <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if request.path == '/' else '' }}">⌂ <span>Dashboard</span></a>
         <a href="{{ url_for('dashboard.streamers') }}" class="{{ 'active' if request.path == '/streamers' else '' }}">◉ <span>Streamers</span></a>
         <a href="{{ url_for('dashboard.clips') }}" class="{{ 'active' if request.path == '/clips' else '' }}">▣ <span>Biblioteca de clips</span></a>
+        <a href="{{ url_for('dashboard.jobs') }}" class="{{ 'active' if request.path == '/jobs' else '' }}">◴ <span>Trabajos</span></a>
         <a href="{{ url_for('dashboard.publications') }}" class="{{ 'active' if request.path == '/publications' else '' }}">◷ <span>Publicaciones</span></a>
         <a href="{{ url_for('dashboard.analytics') }}" class="{{ 'active' if request.path == '/analytics' else '' }}">▥ <span>Analíticas</span></a>
         <a href="{{ url_for('dashboard.settings') }}" class="{{ 'active' if request.path == '/settings' else '' }}">⚙ <span>Configuración</span></a>

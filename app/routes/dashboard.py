@@ -45,3 +45,8 @@ def analytics():
 @dashboard_bp.get("/settings")
 def settings():
     return render_page(*PAGES["/settings"])
+
+
+@dashboard_bp.get("/jobs")
+def jobs():
+    return render_page("jobs.html", "Trabajos")

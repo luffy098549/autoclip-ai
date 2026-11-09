@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+{% if session.get('admin_authenticated') %}
+<section class="panel">
+  <div class="section-heading"><h2>Monitor de procesamiento</h2><span class="tag">Estados reales</span></div>
+  <p class="muted">Aquí puedes observar los estados que guardan los workers cuando reciben una tarea. Las cifras no son porcentajes de progreso estimados.</p>
+  <div class="job-summary" aria-label="Resumen de tareas">
+    <div><strong data-job-count="ready">—</strong><span>Listos</span></div>
+    <div><strong data-job-count="processing">—</strong><span>Procesando</span></div>
+    <div><strong data-job-count="pending">—</strong><span>En espera</span></div>
+    <div><strong data-job-count="failed">—</strong><span>Fallidos</span></div>
+  </div>
+  <div class="library-toolbar">
+    <label>Filtrar por estado
+      <select id="jobs-filter">
+        <option value="">Todos</option>
+        <option value="pending">En espera</option>
+        <option value="processing">Procesando</option>
+        <option value="ready">Listos</option>
+        <option value="failed">Fallidos</option>
+      </select>
+    </label>
+    <button class="button ghost" id="jobs-refresh" type="button">Actualizar</button>
+    <span id="jobs-last-refresh" class="library-count" aria-live="polite">Consultando estado…</span>
+  </div>
+  <div id="jobs-list" class="data-list" aria-live="polite"></div>
+  <p class="smallprint">Actualización automática cada 15 segundos mientras tengas esta pestaña visible. Los detalles de fallos del worker están en sus registros; no se inventa ningún resultado.</p>
+</section>
+{% else %}
+<section class="panel"><h2>Trabajos privados</h2><p class="muted">Inicia sesión para consultar el procesamiento de los videos.</p><a class="button" href="{{ url_for('auth.login') }}">Entrar</a></section>
+{% endif %}
+{% endblock %}

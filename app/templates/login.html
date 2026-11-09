@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Acceso privado · AutoClip AI</title><link rel="stylesheet" href="{{ url_for('static',filename='css/style.css') }}"></head>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Acceso privado · AutoClip AI</title><link rel="stylesheet" href="{{ url_for('static',filename='css/style.css') }}"><link rel="stylesheet" href="{{ url_for('static',filename='css/forms.css') }}"></head>
 <body class="login-page"><main class="login-card"><a class="brand" href="{{ url_for('dashboard.index') }}"><span class="brand-icon">✦</span><span>AutoClip <b>AI</b></span></a>
 <h1>Acceso de administrador</h1><p class="muted">Solo el propietario puede registrar fuentes y preparar recortes.</p>
 {% if error %}<p class="login-error" role="alert">{{ error }}</p>{% endif %}

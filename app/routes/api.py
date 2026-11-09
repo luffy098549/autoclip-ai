@@ -1,6 +1,7 @@
 """Read-only metadata and authenticated owner-only catalog operations."""
 import uuid
 from pathlib import Path
+from subprocess import CalledProcessError, TimeoutExpired
 from flask import Blueprint, current_app, jsonify, request
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -109,7 +110,7 @@ def sources():
                           rights_status=rights, permission_evidence=evidence)
         db.session.add(obj)
         db.session.commit()
-    except (MediaValidationError, OSError, SQLAlchemyError, ValueError) as exc:
+    except (MediaValidationError, OSError, SQLAlchemyError, ValueError, CalledProcessError, TimeoutExpired) as exc:
         db.session.rollback()
         destination.unlink(missing_ok=True)
         return jsonify(error=f"No se pudo importar el video: {exc}"), 400
@@ -141,7 +142,7 @@ def clips():
         return jsonify(error="Fuente sin autorización válida"), 403
     try:
         info = inspect_video(source.source_uri)
-    except (MediaValidationError, OSError) as exc:
+    except (MediaValidationError, OSError, CalledProcessError, TimeoutExpired) as exc:
         return jsonify(error=f"Archivo origen inválido: {exc}"), 400
     if end > info["duration"] + .05:
         return jsonify(error="El corte excede la duración del archivo"), 400

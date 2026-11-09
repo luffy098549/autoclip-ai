@@ -1,5 +1,6 @@
 """Flask application factory for AutoClip AI."""
 import os
+import secrets
 from flask import Flask, jsonify
 from flask_wtf.csrf import CSRFProtect
 from .models import db
@@ -12,7 +13,7 @@ def create_app(config=None):
     app.config.update(
         SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL", "sqlite:///autoclip.db"),
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
-        SECRET_KEY=os.getenv("SECRET_KEY", "development-only-change-me"),
+        SECRET_KEY=os.getenv("SECRET_KEY") or secrets.token_hex(32),
         ADMIN_PASSWORD_HASH=os.getenv("ADMIN_PASSWORD_HASH", ""),
         MEDIA_ROOT=os.getenv("MEDIA_ROOT", os.path.abspath("storage")),
         MAX_CONTENT_LENGTH=500 * 1024 * 1024,

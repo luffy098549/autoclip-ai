@@ -10,7 +10,7 @@ def test_dashboard_renders():
     assert b"AutoClip AI" in response.data
 
 def test_sections_render():
-    for path in ("/streamers", "/clips", "/publications", "/analytics", "/settings"):
+    for path in ("/streamers", "/clips", "/publications", "/analytics", "/settings", "/login"):
         assert client().get(path).status_code == 200
 
 def test_api_status_is_disabled():

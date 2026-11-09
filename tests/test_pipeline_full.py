@@ -12,6 +12,16 @@ import pytest
 from scripts import pipeline_full
 
 
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_rejects_invalid_source_id_before_starting_pipeline(value):
+    with patch.object(sys, "argv", ["pipeline_full", value]):
+        with patch.object(pipeline_full, "create_app") as app:
+            with pytest.raises(SystemExit) as error:
+                pipeline_full.main()
+            assert error.value.code == 2
+            app.assert_not_called()
+
+
 @pytest.mark.parametrize("value", ["0", "6", "-1"])
 def test_rejects_invalid_clip_quota_before_starting_pipeline(value):
     with patch.object(sys, "argv", ["pipeline_full", "1", "--max-clips", value]):

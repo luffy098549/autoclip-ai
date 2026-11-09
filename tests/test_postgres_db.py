@@ -134,3 +134,29 @@ def test_postgres_rejects_duplicate_publication_idempotency_keys():
             text("SELECT count(*) FROM publications WHERE idempotency_key = :key"),
             {"key": key},
         ).scalar_one() == 0
+
+
+def test_postgres_rejects_orphan_clip_and_recovers_transaction():
+    """A clip cannot reference a missing source; rollback restores the session."""
+    from sqlalchemy.exc import IntegrityError
+
+    app = create_app({"TESTING": True})
+    with app.app_context():
+        # The negative ID is deliberately absent from a fresh CI database.
+        missing_source_id = -987654321
+        assert db.session.execute(
+            text("SELECT count(*) FROM sources WHERE id = :id"),
+            {"id": missing_source_id},
+        ).scalar_one() == 0
+        try:
+            db.session.add(Clip(
+                source_id=missing_source_id,
+                start_seconds=0,
+                end_seconds=5,
+            ))
+            with pytest.raises(IntegrityError):
+                db.session.flush()
+        finally:
+            db.session.rollback()
+        # A query after rollback confirms the session is usable again.
+        assert db.session.execute(text("SELECT 1")).scalar_one() == 1

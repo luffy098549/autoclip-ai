@@ -89,3 +89,28 @@ def test_missing_clip_does_not_prevent_rendering_other_candidates(capsys):
     output = capsys.readouterr().out
     assert "Clip 1 failed: not found" in output
     assert "Pipeline summary: rendered=1, already_ready=0, failed=1" in output
+
+
+def test_clip_lookup_error_does_not_stop_other_renders(capsys):
+    fake_app = SimpleNamespace(app_context=lambda: _Context())
+
+    def lookup(model, clip_id):
+        if clip_id == 1:
+            raise RuntimeError("synthetic database lookup failure")
+        return SimpleNamespace(editorial_status="pending")
+
+    with (patch.object(sys, "argv", ["pipeline_full", "42", "--max-clips", "2"]),
+          patch.object(pipeline_full, "create_app", return_value=fake_app),
+          patch.object(pipeline_full, "analyze_source", return_value={
+              "transcript_segments": 2, "candidate_count": 2, "clip_ids": [1, 2]
+          }),
+          patch.object(pipeline_full.db.session, "get", side_effect=lookup),
+          patch.object(pipeline_full, "process_clip", return_value={"path": "clip-2.mp4"}) as process):
+        with pytest.raises(SystemExit) as error:
+            pipeline_full.main()
+        assert error.value.code == 1
+    process.assert_called_once_with(2)
+    output = capsys.readouterr().out
+    assert "Clip 1 failed: RuntimeError" in output
+    assert "Rendered clip: 2 clip-2.mp4" in output
+    assert "Pipeline summary: rendered=1, already_ready=0, failed=1" in output

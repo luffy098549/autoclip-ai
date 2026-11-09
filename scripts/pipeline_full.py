@@ -27,6 +27,9 @@ def main():
         already_ready = 0
         seen_clip_ids = set()
         for clip_id in result["clip_ids"]:
+            if len(seen_clip_ids) >= args.max_clips:
+                print("Clip quota reached; remaining candidates require a separate review batch")
+                break
             if clip_id in seen_clip_ids:
                 print("Skipping duplicate clip:", clip_id)
                 continue

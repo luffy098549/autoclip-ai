@@ -175,3 +175,30 @@ def test_rejected_clip_is_not_automatically_rendered(capsys):
     output = capsys.readouterr().out
     assert "Skipping rejected clip: 1" in output
     assert "Pipeline summary: rendered=1, already_ready=0, failed=0" in output
+
+
+def test_skipped_clips_do_not_exhaust_render_quota(capsys):
+    fake_app = SimpleNamespace(app_context=lambda: _Context())
+    clips = {1: SimpleNamespace(editorial_status="rejected"),
+             2: SimpleNamespace(editorial_status="ready"),
+             3: SimpleNamespace(editorial_status="pending"),
+             4: SimpleNamespace(editorial_status="pending"),
+             5: SimpleNamespace(editorial_status="pending")}
+    with (patch.object(sys, "argv", ["pipeline_full", "42", "--max-clips", "2"]),
+          patch.object(pipeline_full, "create_app", return_value=fake_app),
+          patch.object(pipeline_full, "analyze_source", return_value={
+              "transcript_segments": 5, "candidate_count": 5,
+              "clip_ids": [1, 2, 3, 4, 5]
+          }),
+          patch.object(pipeline_full.db.session, "get",
+                       side_effect=lambda model, cid: clips[cid]) as lookup,
+          patch.object(pipeline_full, "process_clip",
+                       return_value={"path": "clip.mp4"}) as render):
+        pipeline_full.main()
+    assert [call.args[0] for call in render.call_args_list] == [3, 4]
+    assert [call.args[1] for call in lookup.call_args_list] == [1, 2, 3, 4]
+    output = capsys.readouterr().out
+    assert "Skipping rejected clip: 1" in output
+    assert "Already rendered: 2" in output
+    assert "Clip quota reached" in output
+    assert "Pipeline summary: rendered=2, already_ready=1, failed=0" in output

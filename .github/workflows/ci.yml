@@ -64,5 +64,7 @@ jobs:
       - run: python -m pip install -r requirements.txt
       - name: Apply PostgreSQL migrations
         run: python -m scripts.init_db
+      - name: Verify PostgreSQL migrations are idempotent
+        run: python -m scripts.init_db
       - name: Validate PostgreSQL schema and transaction rollback
         run: python -m pytest -q tests/test_postgres_db.py

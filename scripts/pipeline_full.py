@@ -26,8 +26,9 @@ def main():
         failed = 0
         already_ready = 0
         seen_clip_ids = set()
+        attempted_renders = 0
         for clip_id in result["clip_ids"]:
-            if len(seen_clip_ids) >= args.max_clips:
+            if attempted_renders >= args.max_clips:
                 print("Clip quota reached; remaining candidates require a separate review batch")
                 break
             if clip_id in seen_clip_ids:
@@ -47,6 +48,7 @@ def main():
                     already_ready += 1
                     print("Already rendered:", clip_id)
                     continue
+                attempted_renders += 1
                 exported = process_clip(clip_id)
                 rendered += 1
                 print("Rendered clip:", clip_id, exported.get("captioned_path") or exported["path"])

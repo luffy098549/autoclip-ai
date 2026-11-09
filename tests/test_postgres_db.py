@@ -190,3 +190,35 @@ def test_postgres_rejects_duplicate_streamer_identity():
             {"channel": channel},
         ).scalar_one() == 0
         assert db.session.execute(text("SELECT 1")).scalar_one() == 1
+
+
+def test_postgres_allows_same_channel_identifier_on_different_platforms():
+    """Uniqueness is scoped to a platform, not global across providers."""
+    from uuid import uuid4
+
+    app = create_app({"TESTING": True})
+    with app.app_context():
+        channel = f"ci-cross-platform-{uuid4().hex}"
+        try:
+            first = Streamer(
+                display_name="Synthetic YouTube channel",
+                platform="youtube", channel_identifier=channel, active=False,
+            )
+            second = Streamer(
+                display_name="Synthetic Twitch channel",
+                platform="twitch", channel_identifier=channel, active=False,
+            )
+            db.session.add_all([first, second])
+            db.session.flush()
+            assert first.id != second.id
+            assert db.session.execute(
+                text("SELECT count(*) FROM streamers WHERE channel_identifier = :channel"),
+                {"channel": channel},
+            ).scalar_one() == 2
+        finally:
+            db.session.rollback()
+
+        assert db.session.execute(
+            text("SELECT count(*) FROM streamers WHERE channel_identifier = :channel"),
+            {"channel": channel},
+        ).scalar_one() == 0

@@ -10,6 +10,8 @@ parser.add_argument("--model", default="small")
 parser.add_argument("--max-clips", type=int, default=5)
 parser.add_argument("--render", action="store_true")
 args = parser.parse_args()
+if args.source_id <= 0:
+    parser.error("source_id must be a positive integer")
 if not 1 <= args.max_clips <= 5:
     parser.error("--max-clips must be between 1 and 5")
 app = create_app()

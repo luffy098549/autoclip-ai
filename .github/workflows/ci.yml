@@ -26,6 +26,18 @@ jobs:
             echo "Checking $file"
             node --check "$file"
           done
+  social-adapter-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install optional official social SDKs
+        run: python -m pip install -r requirements-social.txt
+      - name: Test mocked social SDK uploads without credentials
+        run: |
+          python -m pytest -q tests/test_social_mocked_sdk.py tests/test_social_publisher_adapters.py tests/test_youtube_publisher.py
   postgres-integration:
     runs-on: ubuntu-latest
     services:

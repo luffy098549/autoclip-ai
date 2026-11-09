@@ -22,6 +22,7 @@ def create_app(config=None):
         SESSION_COOKIE_SECURE=os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true",
         PUBLISHING_ENABLED=False,
         PROCESSING_ENABLED=os.getenv("PROCESSING_ENABLED", "false").lower() == "true",
+        AI_ENABLED=os.getenv("AI_ENABLED", "false").lower() == "true",
     )
     if config:
         app.config.update(config)

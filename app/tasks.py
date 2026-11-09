@@ -21,3 +21,12 @@ def render_clip_task(clip_id: int):
     app = create_app()
     with app.app_context():
         return process_clip(clip_id)
+
+
+@celery_app.task(name="autoclip.analyze_source_task")
+def analyze_source_task(source_id: int):
+    from . import create_app
+    from .services.analyzer import analyze_source
+    app = create_app()
+    with app.app_context():
+        return analyze_source(source_id)

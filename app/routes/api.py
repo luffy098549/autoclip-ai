@@ -22,7 +22,7 @@ def status():
         project="AutoClip AI", version="0.3.0",
         publishing_enabled=False,
         ingestion_enabled=True,
-        ai_detection_enabled=False,
+        ai_detection_enabled=bool(current_app.config.get("AI_ENABLED")),
         platforms=list(PLATFORMS),
         interval_minutes=int(MIN_INTERVAL.total_seconds() / 60),
         daily_limit_per_platform=MAX_PER_DAY,
@@ -160,3 +160,21 @@ def clips():
             db.session.rollback()  # Still awaiting_worker: run locally when broker is down.
     return jsonify(id=obj.id, status=obj.editorial_status,
                    message="Solicitud de recorte registrada. Comprueba el estado en Biblioteca."), 202
+
+
+@api_bp.post("/sources/<int:source_id>/analyze")
+@admin_only
+def analyze_source_request(source_id):
+    if not current_app.config.get("AI_ENABLED"):
+        return jsonify(error="AI desactivada. Instala requirements-ai.txt y activa AI_ENABLED=true"), 503
+    source = db.session.get(MediaSource, source_id)
+    if not source:
+        return jsonify(error="Fuente inexistente"), 404
+    if not assess_rights(source.rights_status, source.permission_evidence).allowed:
+        return jsonify(error="Fuente sin derechos verificados"), 403
+    from ..tasks import analyze_source_task
+    try:
+        task = analyze_source_task.delay(source_id)
+    except Exception:
+        return jsonify(error="Worker o Redis no disponible"), 503
+    return jsonify(task_id=task.id, message="Análisis de transcripción enviado al worker"), 202

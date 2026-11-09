@@ -21,6 +21,9 @@ def process_clip(clip_id: int):
     try:
         info = create_local_clip(source.source_uri, target, start=clip.start_seconds,
                                  end=clip.end_seconds, authorized=True)
+        from .subtitle_export import export_clip_srt
+        subtitles = Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{clip.id}.srt"
+        export_clip_srt(clip.id, subtitles)
         clip.output_path = info["path"]
         clip.editorial_status = "ready"
         db.session.commit()

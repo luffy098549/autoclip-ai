@@ -44,9 +44,12 @@ def main():
                 if clip.editorial_status == "rejected":
                     print("Skipping rejected clip:", clip_id)
                     continue
-                if clip.editorial_status == "ready":
+                if clip.editorial_status in {"ready", "approved", "published"}:
                     already_ready += 1
                     print("Already rendered:", clip_id)
+                    continue
+                if clip.editorial_status == "processing":
+                    print("Skipping clip already processing:", clip_id)
                     continue
                 attempted_renders += 1
                 exported = process_clip(clip_id)

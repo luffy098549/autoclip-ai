@@ -78,3 +78,17 @@ class CompetitorVideo(db.Model):
     duration_iso8601 = db.Column(db.String(32))
     fetched_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     __table_args__ = (UniqueConstraint("streamer_id", "video_id"),)
+
+
+class DailyReviewSlot(db.Model):
+    """One of five persistent review reservations for a New York calendar day."""
+    __tablename__ = "daily_review_slots"
+    id = db.Column(db.Integer, primary_key=True)
+    review_date = db.Column(db.Date, nullable=False)
+    slot = db.Column(db.Integer, nullable=False)
+    clip_id = db.Column(db.Integer, db.ForeignKey("clips.id"), nullable=False)
+    __table_args__ = (
+        db.CheckConstraint("slot >= 1 AND slot <= 5", name="ck_review_slot_range"),
+        UniqueConstraint("review_date", "slot", name="uq_review_date_slot"),
+        UniqueConstraint("clip_id", name="uq_review_clip"),
+    )

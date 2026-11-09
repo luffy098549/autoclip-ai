@@ -20,17 +20,26 @@ def main():
         result = analyze_source(args.source_id, model_size=args.model, max_clips=args.max_clips)
         print("Transcribed segments:", result["transcript_segments"])
         print("Candidates selected:", result["candidate_count"])
+        rendered = 0
+        failed = 0
+        already_ready = 0
         for clip_id in result["clip_ids"]:
             clip = db.session.get(Clip, clip_id)
             if clip.editorial_status == "ready":
+                already_ready += 1
                 print("Already rendered:", clip_id)
                 continue
             try:
                 exported = process_clip(clip_id)
+                rendered += 1
                 print("Rendered clip:", clip_id, exported.get("captioned_path") or exported["path"])
             except Exception as exc:
+                failed += 1
                 print("Clip", clip_id, "failed:", type(exc).__name__)
+        print(f"Pipeline summary: rendered={rendered}, already_ready={already_ready}, failed={failed}")
         print("Review every exported clip before uploading to a social platform.")
+        if failed:
+            raise SystemExit(1)
 
 
 if __name__ == "__main__":

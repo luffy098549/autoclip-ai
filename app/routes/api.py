@@ -190,12 +190,19 @@ def download_clip(clip_id):
     clip = db.session.get(Clip, clip_id)
     if not clip or clip.editorial_status != "ready" or not clip.output_path:
         return jsonify(error="Clip no disponible para descarga"), 404
+    source = db.session.get(MediaSource, clip.source_id)
+    if source is None or not assess_rights(
+        source.rights_status, source.permission_evidence
+    ).allowed:
+        return jsonify(error="No se pueden descargar archivos sin autorización"), 403
     allowed = (Path(current_app.config["MEDIA_ROOT"]) / "clips").resolve()
     path = Path(clip.output_path).resolve()
-    if path.parent != allowed or not path.is_file():
+    if path.parent != allowed or not path.is_file() or path.suffix.lower() != ".mp4":
         return jsonify(error="Archivo de clip no disponible"), 404
-    return send_file(path, as_attachment=True, download_name=f"autoclip-{clip.id}.mp4",
-                     mimetype="video/mp4")
+    response = send_file(path, as_attachment=True,
+                         download_name=f"autoclip-{clip.id}.mp4", mimetype="video/mp4")
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
 
 
 @api_bp.get("/clips/<int:clip_id>/subtitles")

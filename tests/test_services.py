@@ -38,6 +38,6 @@ def test_metadata_titles():
         sanitize_title(" ")
 
 
-def test_youtube_upload_disabled():
-    with pytest.raises(PublishingDisabled):
-        upload_short("clip.mp4")
+def test_youtube_requires_a_real_video_before_any_upload():
+    with pytest.raises(ValueError):
+        upload_short("clip.mp4", "Original demo")

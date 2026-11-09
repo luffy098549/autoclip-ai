@@ -13,6 +13,20 @@
   <label>Tiempo promedio visto (segundos, opcional)<input name="avg_watch_seconds" type="number" min="0" step="0.1"></label>
   <button class="button" type="submit">Guardar estadísticas</button>
 </form><div id="metric-feedback" class="form-feedback" aria-live="polite"></div></section>
+<section class="panel">
+  <div class="section-heading"><h2>Resumen de rendimiento</h2><button type="button" id="analytics-chart-refresh" class="button ghost">Actualizar</button></div>
+  <div class="analytics-kpis">
+    <div><strong data-metric-total="views">—</strong><span>Vistas registradas</span></div>
+    <div><strong data-metric-total="likes">—</strong><span>Me gusta</span></div>
+    <div><strong data-metric-total="shares">—</strong><span>Compartidos</span></div>
+    <div><strong data-metric-total="tracked_clips">—</strong><span>Clips medidos</span></div>
+  </div>
+  <div class="analytics-chart-layout">
+    <div><h3>Visualizaciones por red</h3><div id="analytics-chart" aria-live="polite"><p class="muted">Cargando…</p></div></div>
+    <div><h3>Clips con mayor alcance</h3><div id="analytics-leaders" aria-live="polite"></div></div>
+  </div>
+  <p class="smallprint">Datos introducidos manualmente de cuentas propias; las barras son comparativas, no predicciones de ingresos.</p>
+</section>
 <section class="panel"><h2>Últimas métricas por clip y red</h2><p class="smallprint" id="analytics-totals">Consultando…</p><div id="analytics-list" class="data-list"></div><p class="smallprint">La interacción se calcula como (likes + comentarios + compartidos) / visualizaciones. Es una aproximación descriptiva, no un cálculo de ingresos ni una predicción de viralidad.</p></section>
 {% else %}
 <section class="panel"><h2>Analíticas privadas</h2><p class="muted">Inicia sesión para consultar y registrar datos de tus propias cuentas.</p><a class="button" href="{{ url_for('auth.login') }}">Iniciar sesión</a></section>

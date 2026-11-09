@@ -21,7 +21,7 @@ Automatización de edición de videos cortos **con material propio o autorizado*
 - Generación de subtítulos SRT como archivo adjunto y comando opcional para incrustarlos en video
 - Reproductor privado de clips 9:16, con filtros por estado y descargas MP4/SRT
 - Calendario privado de borradores con cancelación, límites de 120 minutos y máximo 5 por red/día; sin uploads reales
-- Registro manual de métricas de clips publicados desde tus propias cuentas, con cálculo de interacción
+- Registro manual de métricas de clips de tus propias cuentas, gráficos por red y ranking descriptivo por visualizaciones (sin ingresos estimados)
 - Pruebas automatizadas con GitHub Actions
 
 ## NO implementado todavía

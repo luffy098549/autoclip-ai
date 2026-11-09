@@ -118,6 +118,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const stats=document.getElementById("analytics-totals");
     if(stats) stats.textContent="Vistas registradas: "+data.summary.views.toLocaleString("es")+" · Likes: "+data.summary.likes.toLocaleString("es")+" · Compartidos: "+data.summary.shares.toLocaleString("es");
     drawList("analytics-list",data.items,item=>"Clip "+item.clip_id+" · "+item.platform+" · "+item.views.toLocaleString("es")+" vistas · "+item.engagement_percent+"% interacción");
+    window.dispatchEvent(new CustomEvent("autoclip:analytics-updated"));
   }
   const analyticsForm=document.getElementById("metric-form");
   if(analyticsForm){

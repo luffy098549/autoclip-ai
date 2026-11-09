@@ -42,3 +42,12 @@ class Publication(db.Model):
     external_id = db.Column(db.String(255))
     state = db.Column(db.String(30), default="scheduled", nullable=False)
     idempotency_key = db.Column(db.String(128), unique=True, nullable=False)
+
+class TranscriptSegment(db.Model):
+    __tablename__ = "transcript_segments"
+    id = db.Column(db.Integer, primary_key=True)
+    source_id = db.Column(db.Integer, db.ForeignKey("sources.id"), nullable=False, index=True)
+    start_seconds = db.Column(db.Float, nullable=False)
+    end_seconds = db.Column(db.Float, nullable=False)
+    text = db.Column(db.Text, nullable=False)
+    language = db.Column(db.String(20), nullable=True)

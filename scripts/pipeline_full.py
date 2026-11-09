@@ -4,6 +4,7 @@ from app import create_app
 from app.models import db, Clip
 from app.services.analyzer import analyze_source
 from app.services.clip_processor import process_clip
+from app.services.daily_review import reserve_review_slot
 
 
 def main():
@@ -50,6 +51,10 @@ def main():
                     continue
                 if clip.editorial_status == "processing":
                     print("Skipping clip already processing:", clip_id)
+                    continue
+                slot = reserve_review_slot(clip_id)
+                if slot is None:
+                    print("Daily review quota reached; skipping clip:", clip_id)
                     continue
                 attempted_renders += 1
                 exported = process_clip(clip_id)

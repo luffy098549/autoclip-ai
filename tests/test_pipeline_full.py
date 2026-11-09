@@ -202,3 +202,24 @@ def test_skipped_clips_do_not_exhaust_render_quota(capsys):
     assert "Already rendered: 2" in output
     assert "Clip quota reached" in output
     assert "Pipeline summary: rendered=2, already_ready=1, failed=0" in output
+
+
+def test_pipeline_does_not_rerender_approved_published_or_processing_clips(capsys):
+    fake_app = SimpleNamespace(app_context=lambda: _Context())
+    statuses = {1: "approved", 2: "published", 3: "processing", 4: "pending"}
+    with (patch.object(sys, "argv", ["pipeline_full", "42", "--max-clips", "2"]),
+          patch.object(pipeline_full, "create_app", return_value=fake_app),
+          patch.object(pipeline_full, "analyze_source", return_value={
+              "transcript_segments": 4, "candidate_count": 4,
+              "clip_ids": [1, 2, 3, 4]
+          }),
+          patch.object(pipeline_full.db.session, "get",
+                       side_effect=lambda model, cid: SimpleNamespace(editorial_status=statuses[cid])),
+          patch.object(pipeline_full, "process_clip", return_value={"path": "clip-4.mp4"}) as render):
+        pipeline_full.main()
+    render.assert_called_once_with(4)
+    output = capsys.readouterr().out
+    assert "Already rendered: 1" in output
+    assert "Already rendered: 2" in output
+    assert "Skipping clip already processing: 3" in output
+    assert "Pipeline summary: rendered=1, already_ready=2, failed=0" in output

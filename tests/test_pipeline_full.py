@@ -157,3 +157,21 @@ def test_render_quota_is_enforced_when_analyzer_returns_extra_ids(capsys):
     output = capsys.readouterr().out
     assert "Clip quota reached" in output
     assert "Pipeline summary: rendered=2, already_ready=0, failed=0" in output
+
+
+def test_rejected_clip_is_not_automatically_rendered(capsys):
+    fake_app = SimpleNamespace(app_context=lambda: _Context())
+    clips = {1: SimpleNamespace(editorial_status="rejected"),
+             2: SimpleNamespace(editorial_status="pending")}
+    with (patch.object(sys, "argv", ["pipeline_full", "42", "--max-clips", "2"]),
+          patch.object(pipeline_full, "create_app", return_value=fake_app),
+          patch.object(pipeline_full, "analyze_source", return_value={
+              "transcript_segments": 2, "candidate_count": 2, "clip_ids": [1, 2]
+          }),
+          patch.object(pipeline_full.db.session, "get", side_effect=lambda model, cid: clips[cid]),
+          patch.object(pipeline_full, "process_clip", return_value={"path": "clip-2.mp4"}) as render):
+        pipeline_full.main()
+    render.assert_called_once_with(2)
+    output = capsys.readouterr().out
+    assert "Skipping rejected clip: 1" in output
+    assert "Pipeline summary: rendered=1, already_ready=0, failed=0" in output

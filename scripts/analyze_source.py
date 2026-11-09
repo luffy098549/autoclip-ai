@@ -17,9 +17,23 @@ with app.app_context():
     print(result)
     if args.render:
         from app.services.clip_processor import process_clip
+        rendered = failed = already_ready = 0
         for clip_id in result["clip_ids"]:
             clip = db.session.get(Clip, clip_id)
-            if clip.editorial_status == "ready":
+            if clip is None:
+                failed += 1
+                print(f"Clip {clip_id} failed: not found")
                 continue
-            print(f"Rendering clip {clip_id}")
-            process_clip(clip_id)
+            if clip.editorial_status == "ready":
+                already_ready += 1
+                continue
+            try:
+                print(f"Rendering clip {clip_id}")
+                process_clip(clip_id)
+                rendered += 1
+            except Exception as exc:
+                failed += 1
+                print(f"Clip {clip_id} failed: {type(exc).__name__}")
+        print(f"Render summary: rendered={rendered}, already_ready={already_ready}, failed={failed}")
+        if failed:
+            raise SystemExit(1)

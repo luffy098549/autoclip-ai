@@ -10,6 +10,8 @@ parser.add_argument("--model", default="small")
 parser.add_argument("--max-clips", type=int, default=5)
 parser.add_argument("--render", action="store_true")
 args = parser.parse_args()
+if not 1 <= args.max_clips <= 5:
+    parser.error("--max-clips must be between 1 and 5")
 app = create_app()
 with app.app_context():
     result = analyze_source(args.source_id, model_size=args.model,

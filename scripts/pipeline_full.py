@@ -40,6 +40,9 @@ def main():
                     failed += 1
                     print("Clip", clip_id, "failed: not found")
                     continue
+                if clip.editorial_status == "rejected":
+                    print("Skipping rejected clip:", clip_id)
+                    continue
                 if clip.editorial_status == "ready":
                     already_ready += 1
                     print("Already rendered:", clip_id)

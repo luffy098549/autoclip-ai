@@ -1,6 +1,27 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="panel"><div class="section-heading"><h2>Biblioteca de clips</h2><span class="tag">Preparación local</span></div><p class="muted">La edición local con FFmpeg ya dispone de un comando Python. Esta página se conectará a la biblioteca cuando estén listos los endpoints protegidos.</p>
-<div class="empty"><span class="empty-icon">▣</span><h3>No hay clips para visualizar</h3><p>Prueba con un video sobre el que tengas derechos: <code>python -m scripts.clip_local input.mp4 output.mp4 --start 10 --end 35 --authorized</code></p></div>
+{% if session.get('admin_authenticated') %}
+<section class="panel">
+<div class="section-heading"><h2>Importar video autorizado</h2><span class="tag">MP4 · MOV · MKV · WEBM</span></div>
+<form id="source-form" class="editor-form" enctype="multipart/form-data">
+  <label>Archivo de video<input type="file" name="file" accept="video/mp4,video/quicktime,video/x-matroska,video/webm" required></label>
+  <label>Derechos de uso<select name="rights" required><option value="owned">Soy el titular de los derechos</option><option value="licensed">Tengo licencia o permiso documentado</option></select></label>
+  <label>Descripción de la autorización<textarea name="evidence" rows="2" maxlength="3000" placeholder="Ejemplo: grabación original realizada por mí" required></textarea></label>
+  <label>Canal asociado (opcional)<select name="streamer_id" id="source-streamer"><option value="">Sin canal asociado</option></select></label>
+  <button class="button" type="submit">Importar video</button>
+</form><div id="source-feedback" class="form-feedback" aria-live="polite"></div>
 </section>
+<section class="panel"><div class="section-heading"><h2>Preparar recorte</h2><span class="tag">FFmpeg</span></div>
+<form id="clip-form" class="editor-form">
+  <label>Fuente<select id="clip-source" name="source_id" required><option value="">Selecciona una fuente</option></select></label>
+  <label>Inicio (segundos)<input type="number" min="0" step="0.1" name="start" value="0" required></label>
+  <label>Final (segundos)<input type="number" min="0.1" step="0.1" name="end" value="30" required></label>
+  <button class="button" type="submit">Crear tarea de recorte</button>
+</form><p class="smallprint">Si Celery no está disponible, la tarea quedará en espera y podrá procesarse con el comando de administración.</p>
+<div id="clip-feedback" class="form-feedback" aria-live="polite"></div></section>
+<section class="panel"><h2>Mis fuentes</h2><div id="source-list" class="data-list"></div></section>
+<section class="panel"><h2>Biblioteca de clips</h2><div id="clip-list" class="data-list"></div></section>
+{% else %}
+<section class="panel"><h2>Biblioteca de clips</h2><p class="muted">Inicia sesión como administrador para importar material y preparar videos.</p><a class="button" href="{{ url_for('auth.login') }}">Iniciar sesión</a></section>
+{% endif %}
 {% endblock %}

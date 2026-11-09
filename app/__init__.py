@@ -1,7 +1,10 @@
 """Flask application factory for AutoClip AI."""
 import os
 from flask import Flask, jsonify
+from flask_wtf.csrf import CSRFProtect
 from .models import db
+
+csrf = CSRFProtect()
 
 
 def create_app(config=None):
@@ -10,14 +13,23 @@ def create_app(config=None):
         SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL", "sqlite:///autoclip.db"),
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         SECRET_KEY=os.getenv("SECRET_KEY", "development-only-change-me"),
-        MAX_CONTENT_LENGTH=50 * 1024 * 1024,
+        ADMIN_PASSWORD_HASH=os.getenv("ADMIN_PASSWORD_HASH", ""),
+        MEDIA_ROOT=os.getenv("MEDIA_ROOT", os.path.abspath("storage")),
+        MAX_CONTENT_LENGTH=500 * 1024 * 1024,
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
+        SESSION_COOKIE_SECURE=os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true",
         PUBLISHING_ENABLED=False,
+        PROCESSING_ENABLED=os.getenv("PROCESSING_ENABLED", "false").lower() == "true",
     )
     if config:
         app.config.update(config)
     db.init_app(app)
+    csrf.init_app(app)
 
+    from .security import auth_bp
     from .routes import dashboard_bp, api_bp
+    app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(api_bp, url_prefix="/api")
 

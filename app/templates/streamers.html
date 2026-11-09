@@ -1,6 +1,19 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="panel"><div class="section-heading"><h2>Fuentes de creadores</h2><span class="tag">Módulo inicial</span></div><p class="muted">Los perfiles de Kick y YouTube se agregarán aquí cuando el módulo de ingesta autorizada y la administración autenticada estén listos.</p>
-<div class="empty"><span class="empty-icon">◉</span><h3>Aún no hay canales mostrados</h3><p>El siguiente módulo permitirá administrar streamers, permisos y enlaces oficiales sin modificar el código.</p></div>
+{% if session.get('admin_authenticated') %}
+<section class="panel">
+  <div class="section-heading"><h2>Registrar canal</h2><span class="tag">Propietario</span></div>
+  <form id="streamer-form" class="editor-form">
+    <label>Nombre del creador<input name="name" placeholder="Ejemplo: mi canal" maxlength="120" required></label>
+    <label>Plataforma<select name="platform"><option value="kick">Kick</option><option value="youtube">YouTube</option></select></label>
+    <label>Identificador del canal (sin URL)<input name="channel" placeholder="usuario" required maxlength="255"></label>
+    <button class="button" type="submit">Registrar canal</button>
+  </form>
+  <p class="smallprint">Registrar un canal no autoriza descargar ni republicar su contenido.</p>
+  <div id="streamer-feedback" class="form-feedback" aria-live="polite"></div>
 </section>
+<section class="panel"><h2>Canales registrados</h2><div id="streamer-list" class="data-list"><p class="muted">Cargando…</p></div></section>
+{% else %}
+<section class="panel"><h2>Fuentes de creadores</h2><p class="muted">Inicia sesión como administrador para consultar y administrar los canales.</p><a class="button" href="{{ url_for('auth.login') }}">Iniciar sesión</a></section>
+{% endif %}
 {% endblock %}

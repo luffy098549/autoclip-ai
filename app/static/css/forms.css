@@ -1,0 +1,23 @@
+/* Form components for authenticated workflows */
+.editor-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:end}
+.editor-form label{display:flex;flex-direction:column;gap:8px;color:var(--muted);font-size:13px;font-weight:600}
+.editor-form input,.editor-form select,.editor-form textarea,.login-card input{width:100%;padding:11px 12px;background:#0b1525;border:1px solid #36506e;border-radius:10px;color:var(--text);font:inherit}
+.editor-form input[type=file]{padding:10px}
+.editor-form textarea{resize:vertical}
+.editor-form button{justify-self:start;cursor:pointer;border:0}
+.form-feedback{margin-top:14px;font-weight:600;font-size:13px}
+.form-feedback.ok{color:#68e0bd}
+.form-feedback.error{color:#ffac98}
+.data-list{margin-top:15px}
+.data-row{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border)}
+.data-row small{display:block;color:var(--muted)}
+.data-row span{font-size:12px;color:var(--muted);white-space:nowrap}
+.login-page{display:grid;place-items:center;min-height:100vh;padding:24px}
+.login-card{width:min(430px,100%);padding:34px;background:var(--panel);border:1px solid var(--border);border-radius:18px}
+.login-card h1{margin:30px 0 10px}
+.login-card label{display:block;margin:16px 0 8px;font-weight:600}
+.login-card button{border:0;cursor:pointer;margin-top:18px;width:100%}
+.login-error{background:#51221e;color:#ffc5b9;padding:12px;border-radius:9px}
+.inline-form{display:inline}
+.text-button{background:transparent;color:var(--accent);border:0;cursor:pointer}
+@media(max-width:700px){.editor-form{grid-template-columns:1fr}.data-row{align-items:flex-start;flex-direction:column}}

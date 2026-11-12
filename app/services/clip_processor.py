@@ -1,5 +1,8 @@
 """Worker-safe clip processing. Requires prior source authorization."""
 from pathlib import Path
+import logging
+
+logger = logging.getLogger(__name__)
 from flask import current_app
 from sqlalchemy import update
 from ..models import db, Clip, MediaSource
@@ -68,7 +71,12 @@ def process_clip(clip_id: int):
         return info
     except Exception:
         for artifact in reversed(created_artifacts):
-            artifact.unlink(missing_ok=True)
+            try:
+                artifact.unlink(missing_ok=True)
+            except OSError:
+                # Cleanup is best-effort: preserve the rendering exception and
+                # still release the processing claim as failed.
+                logger.exception("Unable to clean up partial clip artifact: %s", artifact.name)
         db.session.rollback()
         clip = db.session.get(Clip, clip_id)
         clip.editorial_status = "failed"

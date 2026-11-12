@@ -27,7 +27,9 @@ def select_candidates(candidates: list[Candidate], *, threshold: float = 75.0,
     # ordering and can displace legitimate high-scoring clips.
     valid = [
         candidate for candidate in candidates
-        if all(math.isfinite(v) for v in (candidate.start, candidate.end, candidate.score))
+        if all(isinstance(v, (int, float)) and not isinstance(v, bool)
+               and math.isfinite(v)
+               for v in (candidate.start, candidate.end, candidate.score))
     ]
     selected = []
     for candidate in sorted(valid, key=lambda x: (-x.score, x.start)):

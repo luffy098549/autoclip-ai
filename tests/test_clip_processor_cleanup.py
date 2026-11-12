@@ -65,3 +65,21 @@ def test_existing_export_survives_failed_worker_attempt(worker_case):
                 process_clip(clip_id)
         assert target.read_bytes() == b"previous export"
         assert db.session.get(Clip, clip_id).editorial_status == "failed"
+
+
+def test_partial_render_is_removed_when_renderer_raises(worker_case):
+    app, clip_id, root = worker_case
+    target = root / "clips" / f"clip-{clip_id}.mp4"
+
+    def failing_render(_source, destination, **_kwargs):
+        Path(destination).parent.mkdir(parents=True, exist_ok=True)
+        Path(destination).write_bytes(b"partial ffmpeg output")
+        raise RuntimeError("ffmpeg failed")
+
+    with app.app_context():
+        with patch("app.services.clip_processor.create_local_clip",
+                   side_effect=failing_render):
+            with pytest.raises(RuntimeError, match="ffmpeg failed"):
+                process_clip(clip_id)
+        assert not target.exists()
+        assert db.session.get(Clip, clip_id).editorial_status == "failed"

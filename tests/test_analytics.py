@@ -47,3 +47,30 @@ def test_reject_nonexistent_metric_clip():
     client.post("/login",data={"password":"correct-password"})
     assert client.post("/api/analytics",json={"clip_id":999,"platform":"youtube",
                         "views":42}).status_code==404
+
+
+def test_reject_nonfinite_average_watch_time():
+    app = create_app({
+        "TESTING": True, "WTF_CSRF_ENABLED": False,
+        "SQLALCHEMY_DATABASE_URI": "sqlite://",
+        "SECRET_KEY": "testing-only",
+        "ADMIN_PASSWORD_HASH": generate_password_hash("correct-password"),
+    })
+    with app.app_context():
+        db.create_all()
+        source = MediaSource(source_uri="owned.mp4", rights_status="owned",
+                             permission_evidence="original")
+        db.session.add(source)
+        db.session.flush()
+        clip = Clip(source_id=source.id, start_seconds=0, end_seconds=20)
+        db.session.add(clip)
+        db.session.commit()
+        clip_id = clip.id
+    client = app.test_client()
+    client.post("/login", data={"password": "correct-password"})
+    for value in ("nan", "inf", "-inf"):
+        response = client.post("/api/analytics", json={
+            "clip_id": clip_id, "platform": "youtube",
+            "views": 10, "avg_watch_seconds": value,
+        })
+        assert response.status_code == 400

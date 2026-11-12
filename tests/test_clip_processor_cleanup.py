@@ -145,7 +145,7 @@ def test_subtitle_export_failure_cleans_only_new_sidecar(worker_case, preexistin
         raise RuntimeError("subtitle interrupted")
 
     with app.app_context():
-        with patch("app.services.clip_processor.create_local_clip", side_effect=render), \\
+        with patch("app.services.clip_processor.create_local_clip", side_effect=render), \
              patch("app.services.subtitle_export.export_clip_srt", side_effect=failed_subtitles):
             with pytest.raises(RuntimeError, match="subtitle interrupted"):
                 process_clip(clip_id)

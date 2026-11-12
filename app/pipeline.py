@@ -1,4 +1,5 @@
 """Explicitly authorized source -> vertical clip; does not publish online."""
+import math
 from pathlib import Path
 from .quality import inspect_video, validate_render
 from .video import render_vertical_clip
@@ -11,7 +12,8 @@ class RightsNotConfirmed(PermissionError):
 def create_local_clip(source, destination, *, start, end, authorized=False):
     if not authorized:
         raise RightsNotConfirmed("Source must be authorized before editing")
-    if end <= start or start < 0:
+    if (not all(math.isfinite(float(v)) for v in (start, end))
+            or end <= start or start < 0):
         raise ValueError("Invalid clip timestamps")
     source_info = inspect_video(source)
     if end > source_info["duration"] + 0.05:

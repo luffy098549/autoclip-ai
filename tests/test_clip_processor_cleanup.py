@@ -83,3 +83,42 @@ def test_partial_render_is_removed_when_renderer_raises(worker_case):
                 process_clip(clip_id)
         assert not target.exists()
         assert db.session.get(Clip, clip_id).editorial_status == "failed"
+
+
+@pytest.mark.parametrize("preexisting", [False, True])
+def test_caption_render_failure_preserves_existing_or_cleans_partial(worker_case, preexisting):
+    app, clip_id, root = worker_case
+    target = root / "clips" / f"clip-{clip_id}.mp4"
+    captioned = root / "clips" / f"clip-{clip_id}-captioned.mp4"
+    if preexisting:
+        captioned.parent.mkdir(parents=True, exist_ok=True)
+        captioned.write_bytes(b"previous captioned export")
+
+    def render(_source, destination, **_kwargs):
+        Path(destination).parent.mkdir(parents=True, exist_ok=True)
+        Path(destination).write_bytes(b"new synthetic export")
+        return {"path": str(destination)}
+
+    def burn(_source, _subtitles, destination):
+        Path(destination).write_bytes(b"partial captioned export")
+        raise RuntimeError("caption ffmpeg failed")
+
+    with app.app_context():
+        app.config["AUTO_CAPTION_ENABLED"] = True
+        with patch("app.services.clip_processor.create_local_clip", side_effect=render), \
+             patch("app.services.subtitle_export.export_clip_srt", return_value=str(root / "subtitles" / "synthetic.srt")), \
+             patch("app.services.caption_burn.burn_subtitles", side_effect=burn) as burn_mock:
+            if preexisting:
+                with pytest.raises(FileExistsError, match="Captioned export already exists"):
+                    process_clip(clip_id)
+                burn_mock.assert_not_called()
+            else:
+                with pytest.raises(RuntimeError, match="caption ffmpeg failed"):
+                    process_clip(clip_id)
+                burn_mock.assert_called_once()
+        assert not target.exists()
+        if preexisting:
+            assert captioned.read_bytes() == b"previous captioned export"
+        else:
+            assert not captioned.exists()
+        assert db.session.get(Clip, clip_id).editorial_status == "failed"

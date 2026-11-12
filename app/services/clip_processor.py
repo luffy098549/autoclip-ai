@@ -13,7 +13,13 @@ def process_clip(clip_id: int):
         raise ValueError("Clip no encontrado")
     source = db.session.get(MediaSource, clip.source_id)
     if source is None or not assess_rights(source.rights_status, source.permission_evidence).allowed:
-        clip.editorial_status = "rejected"
+        # Do not downgrade reviewed/published clips if rights are later revoked.
+        db.session.execute(
+            update(Clip)
+            .where(Clip.id == clip_id, Clip.editorial_status.in_(("draft", "failed", "awaiting_worker")))
+            .values(editorial_status="rejected")
+            .execution_options(synchronize_session="fetch")
+        )
         db.session.commit()
         raise PermissionError("La fuente no tiene autorización válida")
     # Atomic compare-and-set prevents competing workers from rendering the same clip.

@@ -19,7 +19,7 @@ def process_clip(clip_id: int):
     # Atomic compare-and-set prevents competing workers from rendering the same clip.
     claimed = db.session.execute(
         update(Clip)
-        .where(Clip.id == clip_id, Clip.editorial_status.in_(("draft", "failed")))
+        .where(Clip.id == clip_id, Clip.editorial_status.in_(("draft", "failed", "awaiting_worker")))
         .values(editorial_status="processing")
         .execution_options(synchronize_session="fetch")
     )

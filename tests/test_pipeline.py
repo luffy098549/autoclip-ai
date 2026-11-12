@@ -39,3 +39,32 @@ def test_numeric_string_timestamps_are_normalized(monkeypatch, tmp_path):
     create_local_clip("owned.mp4", tmp_path / "out.mp4",
                       start="1.5", end="11.5", authorized=True)
     assert observed["range"] == (1.5, 11.5)
+
+
+def test_failed_render_removes_partial_output(monkeypatch, tmp_path):
+    from app import pipeline
+    output = tmp_path / "partial.mp4"
+    monkeypatch.setattr(pipeline, "inspect_video", lambda _: {
+        "duration": 30.0, "has_audio": True
+    })
+
+    def fail_after_writing(source, target, start, end):
+        Path(target).write_bytes(b"incomplete video")
+        raise RuntimeError("FFmpeg failed during encoding")
+
+    monkeypatch.setattr(pipeline, "render_vertical_clip", fail_after_writing)
+    with pytest.raises(RuntimeError, match="FFmpeg failed"):
+        create_local_clip("owned.mp4", output, start=0, end=10, authorized=True)
+    assert not output.exists()
+
+
+def test_existing_export_not_removed_on_rejected_render(monkeypatch, tmp_path):
+    from app import pipeline
+    output = tmp_path / "existing.mp4"
+    output.write_bytes(b"original video")
+    monkeypatch.setattr(pipeline, "inspect_video", lambda _: {
+        "duration": 30.0, "has_audio": True
+    })
+    with pytest.raises(FileExistsError):
+        create_local_clip("owned.mp4", output, start=0, end=10, authorized=True)
+    assert output.read_bytes() == b"original video"

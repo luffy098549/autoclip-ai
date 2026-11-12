@@ -45,3 +45,18 @@ def test_candidate_selector_rejects_nonfinite_scores():
         Candidate(60, 90, 90),
     ]
     assert select_candidates(candidates) == [Candidate(60, 90, 90)]
+
+
+def test_audio_peaks_raise_reaction_score():
+    segments = [
+        {"start": n * 5.0, "end": n * 5.0 + 4.5,
+         "text": "this is an amazing moment and the whole crowd is reacting right now"}
+        for n in range(12)
+    ]
+    baseline = score_candidates(segments, max_clips=5)
+    enhanced = score_candidates(
+        segments, max_clips=5,
+        audio_peaks=[(20.0, 1.0), (25.0, 1.0), (30.0, 1.0)],
+    )
+    assert baseline and enhanced
+    assert max(x.score for x in enhanced) >= max(x.score for x in baseline)

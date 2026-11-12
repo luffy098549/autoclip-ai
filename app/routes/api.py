@@ -211,6 +211,9 @@ def download_subtitles(clip_id):
     clip = db.session.get(Clip, clip_id)
     if not clip:
         return jsonify(error="Clip inexistente"), 404
+    source = db.session.get(MediaSource, clip.source_id)
+    if source is None or not assess_rights(source.rights_status, source.permission_evidence).allowed:
+        return jsonify(error="No se pueden descargar subtítulos sin autorización"), 403
     path = Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{clip_id}.srt"
     if not path.is_file():
         return jsonify(error="Subtítulos no disponibles"), 404

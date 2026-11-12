@@ -122,3 +122,36 @@ def test_caption_render_failure_preserves_existing_or_cleans_partial(worker_case
         else:
             assert not captioned.exists()
         assert db.session.get(Clip, clip_id).editorial_status == "failed"
+
+
+@pytest.mark.parametrize("preexisting", [False, True])
+def test_subtitle_export_failure_cleans_only_new_sidecar(worker_case, preexisting):
+    app, clip_id, root = worker_case
+    target = root / "clips" / f"clip-{clip_id}.mp4"
+    sidecar = root / "subtitles" / f"clip-{clip_id}.srt"
+    if preexisting:
+        sidecar.parent.mkdir(parents=True, exist_ok=True)
+        sidecar.write_text("reviewed subtitle", encoding="utf-8")
+
+    def render(_source, destination, **_kwargs):
+        Path(destination).parent.mkdir(parents=True, exist_ok=True)
+        Path(destination).write_bytes(b"synthetic export")
+        return {"path": str(destination)}
+
+    def failed_subtitles(_clip_id, destination):
+        if not preexisting:
+            Path(destination).parent.mkdir(parents=True, exist_ok=True)
+            Path(destination).write_text("partial subtitle", encoding="utf-8")
+        raise RuntimeError("subtitle interrupted")
+
+    with app.app_context():
+        with patch("app.services.clip_processor.create_local_clip", side_effect=render), \\
+             patch("app.services.subtitle_export.export_clip_srt", side_effect=failed_subtitles):
+            with pytest.raises(RuntimeError, match="subtitle interrupted"):
+                process_clip(clip_id)
+        assert not target.exists()
+        if preexisting:
+            assert sidecar.read_text(encoding="utf-8") == "reviewed subtitle"
+        else:
+            assert not sidecar.exists()
+        assert db.session.get(Clip, clip_id).editorial_status == "failed"

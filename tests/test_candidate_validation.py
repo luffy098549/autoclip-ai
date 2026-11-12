@@ -23,3 +23,14 @@ def test_candidate_selection_rejects_invalid_overlap_ratio():
             pass
         else:
             raise AssertionError("Invalid overlap ratio must be rejected")
+
+
+def test_nonfinite_candidate_cannot_displace_valid_candidate():
+    candidates = [
+        Candidate(0, 30, math.nan),
+        Candidate(40, 70, 95),
+        Candidate(80, 110, math.inf),
+        Candidate(120, 150, 90),
+    ]
+    selected = select_candidates(candidates, max_count=2)
+    assert [c.score for c in selected] == [95, 90]

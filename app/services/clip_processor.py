@@ -14,6 +14,13 @@ def process_clip(clip_id: int):
     clip = db.session.get(Clip, clip_id)
     if clip is None:
         raise ValueError("Clip no encontrado")
+    # Reject malformed ranges before claiming a worker slot or invoking FFmpeg.
+    # NaN/Infinity bypass ordinary comparisons and can corrupt downstream scoring.
+    import math
+    if (not math.isfinite(clip.start_seconds) or
+            not math.isfinite(clip.end_seconds) or
+            clip.start_seconds < 0 or clip.end_seconds <= clip.start_seconds):
+        raise ValueError("Invalid clip time range")
     source = db.session.get(MediaSource, clip.source_id)
     if source is None or not assess_rights(source.rights_status, source.permission_evidence).allowed:
         # Do not downgrade reviewed/published clips if rights are later revoked.

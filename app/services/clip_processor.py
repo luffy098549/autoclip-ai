@@ -45,10 +45,11 @@ def process_clip(clip_id: int):
                                  end=clip.end_seconds, authorized=True)
         from .subtitle_export import export_clip_srt
         subtitles = Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{clip.id}.srt"
-        subtitle_existed = subtitles.exists()
-        subtitle_path = export_clip_srt(clip.id, subtitles)
-        if subtitle_path and not subtitle_existed:
+        # Register before writing: a failed exporter may leave a partial sidecar.
+        # Only own newly created paths, never a previous reviewed export.
+        if not subtitles.exists():
             created_artifacts.append(subtitles)
+        subtitle_path = export_clip_srt(clip.id, subtitles)
         clip.output_path = info["path"]
         if subtitle_path and current_app.config.get("AUTO_CAPTION_ENABLED"):
             from .caption_burn import burn_subtitles

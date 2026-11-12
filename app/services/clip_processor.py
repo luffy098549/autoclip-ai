@@ -18,23 +18,32 @@ def process_clip(clip_id: int):
     clip.editorial_status = "processing"
     db.session.commit()
     target = Path(current_app.config["MEDIA_ROOT"]) / "clips" / f"clip-{clip.id}.mp4"
+    # Only remove artifacts created by this attempt. Never delete a pre-existing export.
+    created_artifacts = []
     try:
         info = create_local_clip(source.source_uri, target, start=clip.start_seconds,
                                  end=clip.end_seconds, authorized=True)
+        created_artifacts.append(target)
         from .subtitle_export import export_clip_srt
         subtitles = Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{clip.id}.srt"
+        subtitle_existed = subtitles.exists()
         subtitle_path = export_clip_srt(clip.id, subtitles)
+        if subtitle_path and not subtitle_existed:
+            created_artifacts.append(subtitles)
         clip.output_path = info["path"]
         if subtitle_path and current_app.config.get("AUTO_CAPTION_ENABLED"):
             from .caption_burn import burn_subtitles
             captioned = target.with_name(f"clip-{clip.id}-captioned.mp4")
             burn_subtitles(info["path"], subtitle_path, captioned)
+            created_artifacts.append(captioned)
             clip.output_path = str(captioned)
             info["captioned_path"] = str(captioned)
         clip.editorial_status = "ready"
         db.session.commit()
         return info
     except Exception:
+        for artifact in reversed(created_artifacts):
+            artifact.unlink(missing_ok=True)
         db.session.rollback()
         clip = db.session.get(Clip, clip_id)
         clip.editorial_status = "failed"

@@ -53,8 +53,13 @@ def process_clip(clip_id: int):
         if subtitle_path and current_app.config.get("AUTO_CAPTION_ENABLED"):
             from .caption_burn import burn_subtitles
             captioned = target.with_name(f"clip-{clip.id}-captioned.mp4")
-            burn_subtitles(info["path"], subtitle_path, captioned)
+            # Caption rendering can create a partial output before raising.
+            # Register only new files before invoking FFmpeg, and never overwrite
+            # an existing captioned export from a previous attempt.
+            if captioned.exists():
+                raise FileExistsError(f"Captioned export already exists: {captioned.name}")
             created_artifacts.append(captioned)
+            burn_subtitles(info["path"], subtitle_path, captioned)
             clip.output_path = str(captioned)
             info["captioned_path"] = str(captioned)
         clip.editorial_status = "ready"

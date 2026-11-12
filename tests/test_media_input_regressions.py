@@ -29,8 +29,8 @@ def test_renderer_rejects_nonfinite_end_timestamp(tmp_path, bad):
 
 def test_cue_matches_standalone_word_not_substring():
     base = "this is a completely original story with many interesting moments and exciting details " * 3
-    standalone = [{"start": 0, "end": 30, "text": "wow " + base}]
-    embedded = [{"start": 0, "end": 30, "text": "wowzers " + base}]
+    standalone = [{"start": 0, "end": 30, "text": "wow !!! " + base}]
+    embedded = [{"start": 0, "end": 30, "text": "wowzers !!! " + base}]
     with_cue = score_candidates(standalone)
     without_cue = score_candidates(embedded)
     assert with_cue and without_cue

@@ -4,6 +4,7 @@ from ..models import db, MediaSource, Clip, TranscriptSegment
 from .rights import assess_rights
 from .transcription import transcribe_file
 from ..intelligence.highlights import score_candidates
+from ..intelligence.audio_peaks import detect_audio_peaks
 
 
 def analyze_source(source_id: int, *, model_size="small", max_clips=5):
@@ -27,10 +28,14 @@ def analyze_source(source_id: int, *, model_size="small", max_clips=5):
         db.session.commit()
         transcript = TranscriptSegment.query.filter_by(source_id=source.id).order_by(
             TranscriptSegment.start_seconds).all()
+    try:
+        audio_peaks = detect_audio_peaks(source.source_uri)
+    except (OSError, RuntimeError, ValueError):
+        audio_peaks = []  # Transcript-only scoring remains available.
     candidates = score_candidates([
         {"start": t.start_seconds, "end": t.end_seconds, "text": t.text}
         for t in transcript
-    ], max_clips=max_clips)
+    ], max_clips=max_clips, audio_peaks=audio_peaks)
     ids = []
     for choice in candidates:
         existing = Clip.query.filter_by(
@@ -46,4 +51,5 @@ def analyze_source(source_id: int, *, model_size="small", max_clips=5):
             ids.append(clip.id)
     db.session.commit()
     return {"source_id": source_id, "clip_ids": ids,
-            "transcript_segments": len(transcript), "candidate_count": len(ids)}
+            "transcript_segments": len(transcript), "audio_peaks": len(audio_peaks),
+            "candidate_count": len(ids)}

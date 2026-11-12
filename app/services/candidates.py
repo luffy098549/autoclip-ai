@@ -1,5 +1,6 @@
 """Deterministic candidate selection scaffolding; not an AI prediction."""
 from dataclasses import dataclass
+import math
 
 
 @dataclass(frozen=True)
@@ -13,8 +14,12 @@ class Candidate:
 def select_candidates(candidates: list[Candidate], *, threshold: float = 75.0,
                       max_count: int = 5, max_overlap_ratio: float = 0.25) -> list[Candidate]:
     """Select non-duplicated, valid candidate time ranges sorted by score."""
+    if max_count < 1 or not 0 <= max_overlap_ratio <= 1:
+        raise ValueError("Invalid candidate selection settings")
     selected = []
     for candidate in sorted(candidates, key=lambda x: (-x.score, x.start)):
+        if not all(math.isfinite(v) for v in (candidate.start, candidate.end, candidate.score)):
+            continue
         if candidate.start < 0 or candidate.end <= candidate.start:
             continue
         if not 0 <= candidate.score <= 100 or candidate.score < threshold:

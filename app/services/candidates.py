@@ -14,7 +14,8 @@ class Candidate:
 def select_candidates(candidates: list[Candidate], *, threshold: float = 75.0,
                       max_count: int = 5, max_overlap_ratio: float = 0.25) -> list[Candidate]:
     """Select non-duplicated, valid candidate time ranges sorted by score."""
-    if (max_count < 1 or not math.isfinite(threshold)
+    if (not isinstance(max_count, int) or isinstance(max_count, bool)
+            or max_count < 1 or not math.isfinite(threshold)
             or not math.isfinite(max_overlap_ratio)
             or not 0 <= max_overlap_ratio <= 1):
         raise ValueError("Invalid candidate selection settings")

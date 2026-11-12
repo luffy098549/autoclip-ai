@@ -1,5 +1,6 @@
 """Read-only metadata and authenticated owner-only catalog operations."""
 import uuid
+import math
 from pathlib import Path
 from subprocess import CalledProcessError, TimeoutExpired
 from flask import Blueprint, current_app, jsonify, request, send_file
@@ -137,7 +138,7 @@ def clips():
         end = float(data.get("end"))
     except (ValueError, TypeError):
         return jsonify(error="source_id, start y end deben ser números"), 400
-    if not (0 <= start < end <= start + 180):
+    if not (math.isfinite(start) and math.isfinite(end) and 0 <= start < end <= start + 180):
         return jsonify(error="Duración inválida: máximo 180 segundos"), 400
     source = db.session.get(MediaSource, source_id)
     if not source:
@@ -265,7 +266,7 @@ def analytics_metrics():
     figures = (views, likes, comments, shares)
     if any(n < 0 or n > 1_000_000_000_000 for n in figures):
         return jsonify(error="Las cifras deben ser positivas y razonables"), 400
-    if avg_watch is not None and not (0 <= avg_watch <= 100_000):
+    if avg_watch is not None and not (math.isfinite(avg_watch) and 0 <= avg_watch <= 100_000):
         return jsonify(error="Tiempo de visualización inválido"), 400
     metric = PerformanceMetric(clip_id=clip_id, platform=platform, views=views,
                                likes=likes, comments=comments, shares=shares,

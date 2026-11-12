@@ -1,9 +1,12 @@
 """Burn an authorized subtitle file onto an exported vertical clip with FFmpeg."""
+import logging
 import shutil
 import subprocess
 from pathlib import Path
 from uuid import uuid4
 from ..quality import validate_render
+
+logger = logging.getLogger(__name__)
 
 
 def burn_subtitles(source_video, srt_file, output_video):
@@ -33,7 +36,14 @@ def burn_subtitles(source_video, srt_file, output_video):
            text=True, timeout=900)
         return validate_render(output)
     except Exception:
-        output.unlink(missing_ok=True)
+        try:
+            output.unlink(missing_ok=True)
+        except OSError:
+            logger.exception("Failed to remove partial caption export: %s", output.name)
         raise
     finally:
-        local_srt.unlink(missing_ok=True)
+        try:
+            local_srt.unlink(missing_ok=True)
+        except OSError:
+            # A cleanup failure must never hide an encoding or validation error.
+            logger.exception("Failed to remove temporary subtitle file: %s", local_srt.name)

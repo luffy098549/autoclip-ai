@@ -9,3 +9,11 @@ storage/
 *.mov
 *.mkv
 .DS_Store
+
+# Google OAuth credentials and authorization tokens
+client_secret*.json
+client_secrets*.json
+credentials.json
+token.json
+*oauth*token*.json
+secrets/

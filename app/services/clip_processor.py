@@ -36,9 +36,13 @@ def process_clip(clip_id: int):
     # Only remove artifacts created by this attempt. Never delete a pre-existing export.
     created_artifacts = []
     try:
+        # Register the output before invoking FFmpeg: it can leave a partial file
+        # even when it raises. Never take ownership of an existing export.
+        if target.exists():
+            raise FileExistsError(f"Clip export already exists: {target.name}")
+        created_artifacts.append(target)
         info = create_local_clip(source.source_uri, target, start=clip.start_seconds,
                                  end=clip.end_seconds, authorized=True)
-        created_artifacts.append(target)
         from .subtitle_export import export_clip_srt
         subtitles = Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{clip.id}.srt"
         subtitle_existed = subtitles.exists()

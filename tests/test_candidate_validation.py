@@ -70,3 +70,12 @@ def test_candidate_selection_ignores_malformed_candidate_fields():
         Candidate(40, 70, 90),
     ]
     assert select_candidates(candidates) == [Candidate(40, 70, 90)]
+
+
+def test_selection_enforces_five_clip_ceiling():
+    import pytest
+    candidates = [Candidate(i * 40, i * 40 + 30, 90) for i in range(8)]
+    assert len(select_candidates(candidates)) == 5
+    assert len(select_candidates(candidates, max_count=5)) == 5
+    with pytest.raises(ValueError):
+        select_candidates(candidates, max_count=6)

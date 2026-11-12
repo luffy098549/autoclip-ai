@@ -44,7 +44,7 @@ def detect_audio_peaks(path: str, *, interval_seconds: float = 1.0,
     if not energies or max(energies) == 0:
         return []
     sorted_levels = sorted(energies)
-    baseline = sorted_levels[len(sorted_levels) // 2]
+    baseline = sorted_levels[max(0, len(sorted_levels) // 4)]
     peak_threshold = max(300, baseline * 1.8)
     maximum = max(energies)
     return [

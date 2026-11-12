@@ -12,8 +12,11 @@ class RightsNotConfirmed(PermissionError):
 def create_local_clip(source, destination, *, start, end, authorized=False):
     if not authorized:
         raise RightsNotConfirmed("Source must be authorized before editing")
-    if (not all(math.isfinite(float(v)) for v in (start, end))
-            or end <= start or start < 0):
+    try:
+        start, end = float(start), float(end)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("Invalid clip timestamps") from exc
+    if not all(math.isfinite(v) for v in (start, end)) or end <= start or start < 0:
         raise ValueError("Invalid clip timestamps")
     source_info = inspect_video(source)
     if end > source_info["duration"] + 0.05:

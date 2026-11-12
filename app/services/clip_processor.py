@@ -1,6 +1,7 @@
 """Worker-safe clip processing. Requires prior source authorization."""
 from pathlib import Path
 from flask import current_app
+from sqlalchemy import update
 from ..models import db, Clip, MediaSource
 from .rights import assess_rights
 from ..pipeline import create_local_clip
@@ -15,8 +16,16 @@ def process_clip(clip_id: int):
         clip.editorial_status = "rejected"
         db.session.commit()
         raise PermissionError("La fuente no tiene autorización válida")
-    clip.editorial_status = "processing"
+    # Atomic compare-and-set prevents competing workers from rendering the same clip.
+    claimed = db.session.execute(
+        update(Clip)
+        .where(Clip.id == clip_id, Clip.editorial_status.in_(("draft", "failed")))
+        .values(editorial_status="processing")
+        .execution_options(synchronize_session="fetch")
+    )
     db.session.commit()
+    if claimed.rowcount != 1:
+        raise RuntimeError("Clip is already processing or not eligible for rendering")
     target = Path(current_app.config["MEDIA_ROOT"]) / "clips" / f"clip-{clip.id}.mp4"
     # Only remove artifacts created by this attempt. Never delete a pre-existing export.
     created_artifacts = []

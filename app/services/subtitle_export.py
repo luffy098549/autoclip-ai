@@ -24,5 +24,13 @@ def export_clip_srt(clip_id: int, output_path: str | Path) -> Path | None:
         return None
     dest = Path(output_path)
     dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(build_srt(sub), encoding="utf-8")
+    # Exclusive creation protects previously reviewed sidecars from retries.
+    # If the write fails, remove only the file created by this attempt.
+    with dest.open("x", encoding="utf-8") as handle:
+        try:
+            handle.write(build_srt(sub))
+        except BaseException:
+            handle.close()
+            dest.unlink(missing_ok=True)
+            raise
     return dest

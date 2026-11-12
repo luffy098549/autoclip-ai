@@ -14,14 +14,25 @@ class Candidate:
 def select_candidates(candidates: list[Candidate], *, threshold: float = 75.0,
                       max_count: int = 5, max_overlap_ratio: float = 0.25) -> list[Candidate]:
     """Select non-duplicated, valid candidate time ranges sorted by score."""
-    if (max_count < 1 or not math.isfinite(threshold)
+    if (not isinstance(max_count, int) or isinstance(max_count, bool)
+            or not 1 <= max_count <= 5
+            or isinstance(threshold, bool) or not isinstance(threshold, (int, float))
+            or not math.isfinite(threshold) or not 0 <= threshold <= 100
+            or isinstance(max_overlap_ratio, bool)
+            or not isinstance(max_overlap_ratio, (int, float))
             or not math.isfinite(max_overlap_ratio)
             or not 0 <= max_overlap_ratio <= 1):
         raise ValueError("Invalid candidate selection settings")
+    # Filter invalid scores before sorting: NaN does not have a stable
+    # ordering and can displace legitimate high-scoring clips.
+    valid = [
+        candidate for candidate in candidates
+        if all(isinstance(v, (int, float)) and not isinstance(v, bool)
+               and math.isfinite(v)
+               for v in (candidate.start, candidate.end, candidate.score))
+    ]
     selected = []
-    for candidate in sorted(candidates, key=lambda x: (-x.score, x.start)):
-        if not all(math.isfinite(v) for v in (candidate.start, candidate.end, candidate.score)):
-            continue
+    for candidate in sorted(valid, key=lambda x: (-x.score, x.start)):
         if candidate.start < 0 or candidate.end <= candidate.start:
             continue
         if not 0 <= candidate.score <= 100 or candidate.score < threshold:

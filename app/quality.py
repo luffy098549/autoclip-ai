@@ -1,5 +1,6 @@
 """Media validation for a local, authorized video source."""
 import json
+import math
 import shutil
 import subprocess
 from pathlib import Path
@@ -25,17 +26,23 @@ def inspect_video(path):
     if video is None:
         raise MediaValidationError("No video stream found")
     duration = float(report.get("format", {}).get("duration") or 0)
-    if duration <= 0:
-        raise MediaValidationError("Cannot determine a positive duration")
+    if not math.isfinite(duration) or duration <= 0:
+        raise MediaValidationError("Cannot determine a finite positive duration")
+    width = int(video.get("width") or 0)
+    height = int(video.get("height") or 0)
+    if width <= 0 or height <= 0:
+        raise MediaValidationError("Video dimensions must be positive")
     return {
         "duration": duration,
-        "width": int(video.get("width") or 0),
-        "height": int(video.get("height") or 0),
+        "width": width,
+        "height": height,
         "has_audio": any(s.get("codec_type") == "audio" for s in streams),
     }
 
 
 def validate_render(path, expected_min_seconds=1):
+    if not math.isfinite(expected_min_seconds) or expected_min_seconds <= 0:
+        raise MediaValidationError("Minimum duration must be finite and positive")
     info = inspect_video(path)
     if info["width"] != 1080 or info["height"] != 1920:
         raise MediaValidationError("Export must be 1080x1920")

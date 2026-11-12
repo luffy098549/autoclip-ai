@@ -58,3 +58,15 @@ def test_candidate_selection_accepts_valid_boundary_settings():
     candidate = Candidate(0, 30, 100)
     assert select_candidates([candidate], threshold=100, max_overlap_ratio=0) == [candidate]
     assert select_candidates([candidate], threshold=0, max_overlap_ratio=1) == [candidate]
+
+
+def test_candidate_selection_ignores_malformed_candidate_fields():
+    candidates = [
+        Candidate("0", 30, 95),
+        Candidate(0, None, 95),
+        Candidate(0, 30, "99"),
+        Candidate(True, 30, 99),
+        Candidate(0, 30, False),
+        Candidate(40, 70, 90),
+    ]
+    assert select_candidates(candidates) == [Candidate(40, 70, 90)]

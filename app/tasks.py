@@ -33,6 +33,9 @@ def analyze_source_task(source_id: int):
         if app.config.get("AUTO_RENDER_ENABLED"):
             from .models import db, Clip
             from .services.clip_processor import process_clip
+            from .services.daily_review import reserve_review_slot
+            from .services.rights import assess_rights
+            from .models import MediaSource
             successes = []
             failures = []
             for clip_id in result["clip_ids"]:
@@ -41,6 +44,15 @@ def analyze_source_task(source_id: int):
                     successes.append(clip_id)
                     continue
                 try:
+                    if not clip or clip.editorial_status in {"rejected", "processing", "approved", "published"}:
+                        continue
+                    source = db.session.get(MediaSource, clip.source_id)
+                    if source is None or not assess_rights(source.rights_status, source.permission_evidence).allowed:
+                        failures.append(clip_id)
+                        continue
+                    if reserve_review_slot(clip_id) is None:
+                        result.setdefault("deferred_clip_ids", []).append(clip_id)
+                        continue
                     process_clip(clip_id)
                     successes.append(clip_id)
                 except Exception:

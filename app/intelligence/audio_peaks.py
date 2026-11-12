@@ -3,9 +3,23 @@
 The returned peaks are normalized relative to the source audio. They indicate
 energy changes, not emotions or guaranteed virality.
 """
-import audioop
+import array
 import math
 import subprocess
+import sys
+
+
+def _rms_s16le(data: bytes) -> int:
+    """Calculate RMS for signed 16-bit little-endian PCM (Python 3.13+ safe)."""
+    usable = len(data) - (len(data) % 2)
+    if usable <= 0:
+        return 0
+    samples = array.array("h")
+    samples.frombytes(data[:usable])
+    if sys.byteorder != "little":
+        samples.byteswap()
+    mean_square = sum(sample * sample for sample in samples) / len(samples)
+    return int(math.sqrt(mean_square))
 
 
 def detect_audio_peaks(path: str, *, interval_seconds: float = 1.0,
@@ -31,7 +45,7 @@ def detect_audio_peaks(path: str, *, interval_seconds: float = 1.0,
                 break
             if len(data) < 2:
                 break
-            energies.append(audioop.rms(data[:len(data) - len(data) % 2], 2))
+            energies.append(_rms_s16le(data))
         code = process.wait(timeout=15)
         if code != 0:
             raise RuntimeError("FFmpeg audio analysis failed")

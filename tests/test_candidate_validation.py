@@ -42,3 +42,19 @@ def test_candidate_selection_rejects_non_integer_limits():
     for count in (True, 1.5, 0, -1):
         with pytest.raises(ValueError):
             select_candidates([candidate], max_count=count)
+
+def test_candidate_selection_rejects_malformed_settings():
+    import pytest
+    candidate = Candidate(0, 30, 90)
+    for threshold in (None, "75", True, -1, 101):
+        with pytest.raises(ValueError):
+            select_candidates([candidate], threshold=threshold)
+    for ratio in (None, "0.25", True, -0.1, 1.1):
+        with pytest.raises(ValueError):
+            select_candidates([candidate], max_overlap_ratio=ratio)
+
+
+def test_candidate_selection_accepts_valid_boundary_settings():
+    candidate = Candidate(0, 30, 100)
+    assert select_candidates([candidate], threshold=100, max_overlap_ratio=0) == [candidate]
+    assert select_candidates([candidate], threshold=0, max_overlap_ratio=1) == [candidate]

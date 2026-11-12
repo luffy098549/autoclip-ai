@@ -34,3 +34,11 @@ def test_nonfinite_candidate_cannot_displace_valid_candidate():
     ]
     selected = select_candidates(candidates, max_count=2)
     assert [c.score for c in selected] == [95, 90]
+
+
+def test_candidate_selection_rejects_non_integer_limits():
+    import pytest
+    candidate = Candidate(0, 30, 90)
+    for count in (True, 1.5, 0, -1):
+        with pytest.raises(ValueError):
+            select_candidates([candidate], max_count=count)

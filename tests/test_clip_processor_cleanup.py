@@ -155,3 +155,29 @@ def test_subtitle_export_failure_cleans_only_new_sidecar(worker_case, preexistin
         else:
             assert not sidecar.exists()
         assert db.session.get(Clip, clip_id).editorial_status == "failed"
+
+
+def test_cleanup_error_does_not_mask_render_failure(worker_case):
+    app, clip_id, root = worker_case
+    target = root / "clips" / f"clip-{clip_id}.mp4"
+
+    def failing_render(_source, destination, **_kwargs):
+        Path(destination).parent.mkdir(parents=True, exist_ok=True)
+        Path(destination).write_bytes(b"partial synthetic data")
+        raise RuntimeError("original ffmpeg failure")
+
+    original_unlink = Path.unlink
+
+    def blocked_unlink(path, *args, **kwargs):
+        if path == target:
+            raise PermissionError("synthetic cleanup denied")
+        return original_unlink(path, *args, **kwargs)
+
+    with app.app_context():
+        with patch("app.services.clip_processor.create_local_clip", side_effect=failing_render), \
+             patch("pathlib.Path.unlink", autospec=True, side_effect=blocked_unlink):
+            with pytest.raises(RuntimeError, match="original ffmpeg failure"):
+                process_clip(clip_id)
+        db.session.expire_all()
+        assert db.session.get(Clip, clip_id).editorial_status == "failed"
+        assert target.exists()  # Needs operational cleanup after permission repair.

@@ -24,3 +24,24 @@ def test_sparse_or_blank_audio_returns_no_clips():
 def test_subtitle_builder_timestamps():
     srt = build_srt([{"start": 1.5, "end": 2.5, "text": "Hola mundo"}])
     assert "00:00:01,500 --> 00:00:02,500" in srt
+
+
+def test_highlights_skip_invalid_timestamps_and_large_silence():
+    segments = [
+        {"start": float("nan"), "end": 10, "text": "wow"},
+        {"start": -3, "end": 1, "text": "wow"},
+        {"start": 0, "end": 5, "text": "wow this is an amazing moment"},
+        {"start": 30, "end": 35, "text": "wait no way that happened"},
+    ]
+    assert score_candidates(segments) == []
+
+
+def test_candidate_selector_rejects_nonfinite_scores():
+    from app.services.candidates import Candidate, select_candidates
+    candidates = [
+        Candidate(0, 30, float("nan")),
+        Candidate(30, 60, float("inf")),
+        Candidate(float("nan"), 60, 90),
+        Candidate(60, 90, 90),
+    ]
+    assert select_candidates(candidates) == [Candidate(60, 90, 90)]

@@ -1,5 +1,6 @@
 """Transcript-derived candidate windows. Heuristic prototype, not viral prediction."""
 import re
+import math
 from ..services.candidates import Candidate, select_candidates
 
 CUES = {
@@ -16,15 +17,23 @@ def score_candidates(transcript_segments: list[dict], *,
     """Return nonoverlapping candidate windows from timed text; scoring is experimental."""
     if minimum_seconds <= 0 or maximum_seconds < minimum_seconds:
         raise ValueError("Invalid duration constraints")
-    segments = sorted(
-        (s for s in transcript_segments if float(s["end"]) > float(s["start"])),
-        key=lambda x: float(x["start"]),
-    )
+    segments = []
+    for segment in transcript_segments:
+        try:
+            start, end = float(segment["start"]), float(segment["end"])
+        except (KeyError, TypeError, ValueError, OverflowError):
+            continue
+        if not (math.isfinite(start) and math.isfinite(end) and 0 <= start < end):
+            continue
+        segments.append({"start": start, "end": end, "text": str(segment.get("text") or "")})
+    segments.sort(key=lambda x: x["start"])
     out = []
     for i, begin in enumerate(segments):
         start = float(begin["start"])
         covered = []
         for segment in segments[i:]:
+            if covered and float(segment["start"]) - float(covered[-1]["end"]) > 4:
+                break
             end = float(segment["end"])
             if end - start > maximum_seconds:
                 break
@@ -37,7 +46,9 @@ def score_candidates(transcript_segments: list[dict], *,
             if len(words) < 20:
                 continue
             lowered = text.casefold()
-            cues = sum(1 for word in CUES if word in lowered)
+            cues = sum(1 for cue in CUES if re.search(
+                r"(?<!\\w)" + re.escape(cue) + r"(?!\\w)", lowered
+            ))
             expressions = min(4, text.count("!") + text.count("?") + text.count("¡") + text.count("¿"))
             density = len(words) / max(span, 1.0)
             diversity = len(set(w.casefold() for w in words)) / len(words)

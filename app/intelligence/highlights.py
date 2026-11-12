@@ -13,9 +13,12 @@ CUES = {
 def score_candidates(transcript_segments: list[dict], *,
                      minimum_seconds: float = 18,
                      maximum_seconds: float = 65,
-                     max_clips: int = 5) -> list[Candidate]:
+                     max_clips: int = 5,
+                     audio_peaks: list[tuple[float, float]] | None = None) -> list[Candidate]:
     """Return nonoverlapping candidate windows from timed text; scoring is experimental."""
-    if minimum_seconds <= 0 or maximum_seconds < minimum_seconds:
+    if (not all(math.isfinite(x) for x in (minimum_seconds, maximum_seconds))
+            or minimum_seconds <= 0 or maximum_seconds < minimum_seconds
+            or not 1 <= max_clips <= 5):
         raise ValueError("Invalid duration constraints")
     segments = []
     for segment in transcript_segments:
@@ -52,8 +55,16 @@ def score_candidates(transcript_segments: list[dict], *,
             expressions = min(4, text.count("!") + text.count("?") + text.count("¡") + text.count("¿"))
             density = len(words) / max(span, 1.0)
             diversity = len(set(w.casefold() for w in words)) / len(words)
+            audio_bonus = 0.0
+            if audio_peaks:
+                audio_bonus = min(12.0, sum(
+                    min(1.0, max(0.0, strength)) * 4.0
+                    for timestamp, strength in audio_peaks
+                    if math.isfinite(timestamp) and math.isfinite(strength)
+                    and start <= timestamp < end
+                ))
             score = min(100.0, 48 + min(cues, 4) * 6 + expressions * 3
-                        + min(1.8, density) * 5 + diversity * 11)
+                        + min(1.8, density) * 5 + diversity * 11 + audio_bonus)
             out.append(Candidate(start, end, round(score, 1),
                                  reason="Heuristic score from timed transcript"))
             # One candidate of roughly 30-55 seconds per starting segment.

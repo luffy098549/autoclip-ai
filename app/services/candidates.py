@@ -18,10 +18,14 @@ def select_candidates(candidates: list[Candidate], *, threshold: float = 75.0,
             or not math.isfinite(max_overlap_ratio)
             or not 0 <= max_overlap_ratio <= 1):
         raise ValueError("Invalid candidate selection settings")
+    # Filter invalid scores before sorting: NaN does not have a stable
+    # ordering and can displace legitimate high-scoring clips.
+    valid = [
+        candidate for candidate in candidates
+        if all(math.isfinite(v) for v in (candidate.start, candidate.end, candidate.score))
+    ]
     selected = []
-    for candidate in sorted(candidates, key=lambda x: (-x.score, x.start)):
-        if not all(math.isfinite(v) for v in (candidate.start, candidate.end, candidate.score)):
-            continue
+    for candidate in sorted(valid, key=lambda x: (-x.score, x.start)):
         if candidate.start < 0 or candidate.end <= candidate.start:
             continue
         if not 0 <= candidate.score <= 100 or candidate.score < threshold:

@@ -25,7 +25,7 @@ def burn_subtitles(source_video, srt_file, output_video):
         # Controlled, generated SRT filename in the video's directory avoids
         # FFmpeg's cross-platform filter path/colon escaping problems.
         subprocess.run([
-            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-n",
             "-i", source.name, "-vf", f"subtitles={local_srt.name}",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
             "-c:a", "copy", "-movflags", "+faststart", str(output),

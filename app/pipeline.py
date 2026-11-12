@@ -26,9 +26,11 @@ def create_local_clip(source, destination, *, start, end, authorized=False):
     out = Path(destination)
     if out.exists():
         raise FileExistsError(f"Refusing to overwrite {out}")
-    result = render_vertical_clip(source, out, start, end)
     try:
+        result = render_vertical_clip(source, out, start, end)
         return {"path": result, "source": source_info, "export": validate_render(result)}
     except Exception:
+        # FFmpeg may leave a truncated MP4 when encoding fails. The output was
+        # confirmed absent before rendering, so discard this attempt's artifact.
         out.unlink(missing_ok=True)
         raise

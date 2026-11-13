@@ -21,11 +21,17 @@ def inspect_runtime(find_spec=importlib.util.find_spec, environ=None):
 
 def inspect_media_tools(which=shutil.which):
     """Report only executable availability; never invoke external programs."""
-    return which("ffmpeg") is not None, which("ffprobe") is not None
+    results = []
+    for binary in ("ffmpeg", "ffprobe"):
+        try:
+            results.append(which(binary) is not None)
+        except (OSError, ValueError, TypeError):
+            results.append(False)
+    return tuple(results)
 
 
 def main():
-    raw_setting = os.environ.get("AI_ENABLED", "false").strip().lower()
+    raw_setting = str(os.environ.get("AI_ENABLED", "false")).strip().lower()
     if raw_setting not in {"1", "true", "yes", "on", "0", "false", "no", "off", ""}:
         print("ERROR: AI_ENABLED has an unrecognized value; use true or false.")
         return 2

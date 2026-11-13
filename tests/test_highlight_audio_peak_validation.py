@@ -53,3 +53,25 @@ def test_malformed_peak_collection_preserves_transcript_score(bad_collection):
 def test_tuple_collection_with_valid_peak_still_scores():
     expected = score_candidates(SEGMENTS, audio_peaks=[(2.0, 0.5)])
     assert score_candidates(SEGMENTS, audio_peaks=((2.0, 0.5),)) == expected
+
+
+@pytest.mark.parametrize("timestamp, expected_bonus", [
+    (0.0, 4.0), (19.999, 4.0), (20.0, 0.0), (-0.01, 0.0),
+])
+def test_peak_window_is_start_inclusive_end_exclusive(timestamp, expected_bonus):
+    baseline = score_candidates(SEGMENTS)[0].score
+    actual = score_candidates(SEGMENTS, audio_peaks=[(timestamp, 1.0)])[0].score
+    assert actual == pytest.approx(min(100.0, baseline + expected_bonus))
+
+
+def test_audio_bonus_is_capped_at_twelve_points():
+    baseline = score_candidates(SEGMENTS)[0].score
+    peaks = [(float(i), 1.0) for i in range(15)]
+    actual = score_candidates(SEGMENTS, audio_peaks=peaks)[0].score
+    assert actual == pytest.approx(min(100.0, baseline + 12.0))
+
+
+def test_negative_and_above_one_strength_are_clamped():
+    baseline = score_candidates(SEGMENTS)[0].score
+    actual = score_candidates(SEGMENTS, audio_peaks=[(1.0, -3.0), (2.0, 10.0)])[0].score
+    assert actual == pytest.approx(min(100.0, baseline + 4.0))

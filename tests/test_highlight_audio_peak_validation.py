@@ -39,3 +39,17 @@ def test_mixed_valid_and_invalid_peaks_keep_valid_bonus():
     )
     expected = score_candidates(SEGMENTS, audio_peaks=[(2.0, 0.5)])
     assert result == expected
+
+
+@pytest.mark.parametrize("bad_collection", [
+    False, True, 1, 2.5, "not peaks", b"not peaks",
+    {"timestamp": 1.0}, object(),
+])
+def test_malformed_peak_collection_preserves_transcript_score(bad_collection):
+    baseline = score_candidates(SEGMENTS)
+    assert score_candidates(SEGMENTS, audio_peaks=bad_collection) == baseline
+
+
+def test_tuple_collection_with_valid_peak_still_scores():
+    expected = score_candidates(SEGMENTS, audio_peaks=[(2.0, 0.5)])
+    assert score_candidates(SEGMENTS, audio_peaks=((2.0, 0.5),)) == expected

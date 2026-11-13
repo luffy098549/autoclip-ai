@@ -41,12 +41,14 @@ def main():
     ffmpeg, ffprobe = inspect_media_tools()
     print("FFmpeg installed:", "yes" if ffmpeg else "no")
     print("FFprobe installed:", "yes" if ffprobe else "no")
-    if enabled and not (ffmpeg and ffprobe):
+    missing_media = enabled and not (ffmpeg and ffprobe)
+    missing_whisper = enabled and not installed
+    if missing_media:
         print("ERROR: AI processing requires FFmpeg and FFprobe executables.")
-        return 1
-    if enabled and not installed:
+    if missing_whisper:
         print("ERROR: AI_ENABLED is true but faster-whisper is missing.")
         print("Rebuild the worker with INSTALL_AI=true; do not use pip install in a running container.")
+    if missing_media or missing_whisper:
         return 1
     if not installed:
         print("AI is optional. Rebuild with INSTALL_AI=true to install faster-whisper.")

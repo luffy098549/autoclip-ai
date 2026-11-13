@@ -9,6 +9,13 @@ celery_app = Celery(
 celery_app.conf.timezone = "America/New_York"
 
 
+def _positive_id(value, label):
+    """Reject malformed task payloads before opening a Flask/DB context."""
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise ValueError(f"{label} must be a positive integer")
+    return value
+
+
 @celery_app.task
 def heartbeat():
     return {"service": "autoclip", "status": "alive"}
@@ -16,6 +23,7 @@ def heartbeat():
 
 @celery_app.task(name="autoclip.render_clip_task")
 def render_clip_task(clip_id: int):
+    _positive_id(clip_id, "clip_id")
     from . import create_app
     from .services.clip_processor import process_clip
     app = create_app()
@@ -25,6 +33,7 @@ def render_clip_task(clip_id: int):
 
 @celery_app.task(name="autoclip.analyze_source_task")
 def analyze_source_task(source_id: int):
+    _positive_id(source_id, "source_id")
     from . import create_app
     from .services.analyzer import analyze_source
     app = create_app()
@@ -38,7 +47,18 @@ def analyze_source_task(source_id: int):
             from .models import MediaSource
             successes = []
             failures = []
+            seen_clip_ids = set()
             for clip_id in result["clip_ids"]:
+                # Malformed analyzer output must not abort processing valid candidates.
+                try:
+                    _positive_id(clip_id, "clip_id")
+                except ValueError:
+                    failures.append(clip_id)
+                    continue
+                # The analyzer can return repeated candidates; render each at most once.
+                if clip_id in seen_clip_ids:
+                    continue
+                seen_clip_ids.add(clip_id)
                 clip = db.session.get(Clip, clip_id)
                 if clip and clip.editorial_status == "ready":
                     successes.append(clip_id)
@@ -65,6 +85,7 @@ def analyze_source_task(source_id: int):
 
 @celery_app.task(name="autoclip.youtube_metadata_task")
 def youtube_metadata_task(streamer_id: int):
+    _positive_id(streamer_id, "streamer_id")
     import os
     from . import create_app
     from .services.competitor_sync import sync_youtube_channel

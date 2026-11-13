@@ -1,15 +1,25 @@
-"""Regression coverage for whole-word highlight cues."""
+"""Regression coverage for whole-word highlight cues.
+
+Inspect raw heuristic scores independently of the production selection threshold:
+the test sentences intentionally have low lexical diversity.
+"""
 from app.intelligence import highlights
 
 
 def _score(text, monkeypatch):
     monkeypatch.setattr(highlights, "CUES", {"wow"})
+    # Keep the score under test independent of the separate ranking threshold.
+    monkeypatch.setattr(
+        highlights,
+        "select_candidates",
+        lambda candidates, **kwargs: sorted(candidates, key=lambda c: c.score, reverse=True)[:1],
+    )
     segments = [
         {"start": i * 5.0, "end": i * 5.0 + 4.5, "text": text}
         for i in range(9)
     ]
     candidates = highlights.score_candidates(segments, max_clips=1)
-    assert candidates, "Test fixture should yield a candidate"
+    assert candidates, "Test fixture should yield a scored window"
     return candidates[0].score
 
 

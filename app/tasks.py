@@ -49,11 +49,16 @@ def analyze_source_task(source_id: int):
             failures = []
             seen_clip_ids = set()
             for clip_id in result["clip_ids"]:
+                # Malformed analyzer output must not abort processing valid candidates.
+                try:
+                    _positive_id(clip_id, "clip_id")
+                except ValueError:
+                    failures.append(clip_id)
+                    continue
                 # The analyzer can return repeated candidates; render each at most once.
                 if clip_id in seen_clip_ids:
                     continue
                 seen_clip_ids.add(clip_id)
-                _positive_id(clip_id, "clip_id")
                 clip = db.session.get(Clip, clip_id)
                 if clip and clip.editorial_status == "ready":
                     successes.append(clip_id)

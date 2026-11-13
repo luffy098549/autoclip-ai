@@ -57,12 +57,21 @@ def score_candidates(transcript_segments: list[dict], *,
             diversity = len(set(w.casefold() for w in words)) / len(words)
             audio_bonus = 0.0
             if audio_peaks:
-                audio_bonus = min(12.0, sum(
-                    min(1.0, max(0.0, strength)) * 4.0
-                    for timestamp, strength in audio_peaks
-                    if math.isfinite(timestamp) and math.isfinite(strength)
-                    and start <= timestamp < end
-                ))
+                # Ignore malformed detector output without losing transcript candidates.
+                # Never coerce booleans, strings, NaN or infinite peak values.
+                bonus = 0.0
+                for peak in audio_peaks:
+                    if not isinstance(peak, (tuple, list)) or len(peak) != 2:
+                        continue
+                    timestamp, strength = peak
+                    if (type(timestamp) not in (int, float)
+                            or type(strength) not in (int, float)
+                            or not math.isfinite(timestamp)
+                            or not math.isfinite(strength)):
+                        continue
+                    if start <= timestamp < end:
+                        bonus += min(1.0, max(0.0, strength)) * 4.0
+                audio_bonus = min(12.0, bonus)
             score = min(100.0, 48 + min(cues, 4) * 6 + expressions * 3
                         + min(1.8, density) * 5 + diversity * 11 + audio_bonus)
             out.append(Candidate(start, end, round(score, 1),

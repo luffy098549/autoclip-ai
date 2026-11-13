@@ -24,7 +24,7 @@ def inspect_media_tools(which=shutil.which):
     results = []
     for binary in ("ffmpeg", "ffprobe"):
         try:
-            results.append(which(binary) is not None)
+            results.append(bool(which(binary)))
         except (OSError, ValueError, TypeError):
             results.append(False)
     return tuple(results)

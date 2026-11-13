@@ -13,12 +13,16 @@ def inspect_runtime(find_spec=importlib.util.find_spec, environ=None):
     enabled = str(env.get("AI_ENABLED", "false")).strip().lower() in {"1", "true", "yes", "on"}
     try:
         installed = find_spec("faster_whisper") is not None
-    except (ImportError, ValueError, ModuleNotFoundError):
+    except (ImportError, ValueError, ModuleNotFoundError, OSError):
         installed = False
     return enabled, installed
 
 
 def main():
+    raw_setting = os.environ.get("AI_ENABLED", "false").strip().lower()
+    if raw_setting not in {"1", "true", "yes", "on", "0", "false", "no", "off", ""}:
+        print("ERROR: AI_ENABLED has an unrecognized value; use true or false.")
+        return 2
     enabled, installed = inspect_runtime()
     print("AI_ENABLED:", "true" if enabled else "false")
     print("faster-whisper installed:", "yes" if installed else "no")

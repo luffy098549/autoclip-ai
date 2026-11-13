@@ -23,3 +23,8 @@ def test_rms_s16le_empty_input():
 def test_rms_s16le_full_scale_samples():
     raw = struct.pack("<2h", -32768, 32767)
     assert 32767 <= _rms_s16le(raw) <= 32768
+
+
+def test_rms_s16le_ignores_single_trailing_byte_after_zero_samples():
+    raw = struct.pack("<2h", 0, 0) + bytes([0xff])
+    assert _rms_s16le(raw) == 0

@@ -112,3 +112,23 @@ def test_nonstring_ai_enabled_does_not_crash(monkeypatch, capsys):
     monkeypatch.setattr("scripts.check_ai_runtime.os.environ", WeirdEnvironment())
     assert main() == 2
     assert "unrecognized value" in capsys.readouterr().out
+
+
+def test_enabled_ai_reports_all_missing_dependencies(monkeypatch, capsys):
+    monkeypatch.setenv("AI_ENABLED", "true")
+    monkeypatch.setattr("scripts.check_ai_runtime.inspect_runtime", lambda: (True, False))
+    monkeypatch.setattr("scripts.check_ai_runtime.inspect_media_tools", lambda: (False, False))
+    assert main() == 1
+    output = capsys.readouterr().out
+    assert "FFmpeg and FFprobe executables" in output
+    assert "faster-whisper is missing" in output
+
+
+def test_enabled_ai_missing_media_but_whisper_present(monkeypatch, capsys):
+    monkeypatch.setenv("AI_ENABLED", "true")
+    monkeypatch.setattr("scripts.check_ai_runtime.inspect_runtime", lambda: (True, True))
+    monkeypatch.setattr("scripts.check_ai_runtime.inspect_media_tools", lambda: (False, True))
+    assert main() == 1
+    output = capsys.readouterr().out
+    assert "FFmpeg and FFprobe executables" in output
+    assert "faster-whisper is missing" not in output

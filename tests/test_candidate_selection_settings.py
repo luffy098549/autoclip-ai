@@ -35,3 +35,27 @@ def test_overlapping_duplicate_is_filtered():
         Candidate(30, 60, 90),
     ])
     assert [(item.start, item.end) for item in selected] == [(0, 30), (30, 60)]
+
+
+@pytest.mark.parametrize("invalid", [-1, 101, float("inf"), float("nan")])
+def test_rejects_out_of_range_threshold(invalid):
+    with pytest.raises(ValueError, match="Invalid candidate selection settings"):
+        select_candidates([], threshold=invalid)
+
+
+def test_nonfinite_or_non_numeric_candidates_do_not_disrupt_ranking():
+    candidates = [
+        Candidate(0, 30, float("nan")),
+        Candidate(30, 60, 99),
+        Candidate(60, 90, "high"),
+        Candidate(None, 120, 88),
+        Candidate(90, 120, 95),
+    ]
+    selected = select_candidates(candidates)
+    assert [(item.start, item.end) for item in selected] == [(30, 60), (90, 120)]
+
+
+def test_boolean_candidate_fields_are_rejected():
+    assert select_candidates([Candidate(True, 30, 99), Candidate(30, 60, 90)]) == [
+        Candidate(30, 60, 90)
+    ]

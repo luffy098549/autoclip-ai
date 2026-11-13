@@ -47,7 +47,13 @@ def analyze_source_task(source_id: int):
             from .models import MediaSource
             successes = []
             failures = []
+            seen_clip_ids = set()
             for clip_id in result["clip_ids"]:
+                # The analyzer can return repeated candidates; render each at most once.
+                if clip_id in seen_clip_ids:
+                    continue
+                seen_clip_ids.add(clip_id)
+                _positive_id(clip_id, "clip_id")
                 clip = db.session.get(Clip, clip_id)
                 if clip and clip.editorial_status == "ready":
                     successes.append(clip_id)

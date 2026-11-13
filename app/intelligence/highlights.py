@@ -16,7 +16,8 @@ def score_candidates(transcript_segments: list[dict], *,
                      max_clips: int = 5,
                      audio_peaks: list[tuple[float, float]] | None = None) -> list[Candidate]:
     """Return nonoverlapping candidate windows from timed text; scoring is experimental."""
-    if (not all(math.isfinite(x) for x in (minimum_seconds, maximum_seconds))
+    if (any(type(x) not in (int, float) for x in (minimum_seconds, maximum_seconds))
+            or not all(math.isfinite(x) for x in (minimum_seconds, maximum_seconds))
             or minimum_seconds <= 0 or maximum_seconds < minimum_seconds
             or type(max_clips) is not int or not 1 <= max_clips <= 5):
         raise ValueError("Invalid duration constraints")

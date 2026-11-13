@@ -56,7 +56,7 @@ def score_candidates(transcript_segments: list[dict], *,
             density = len(words) / max(span, 1.0)
             diversity = len(set(w.casefold() for w in words)) / len(words)
             audio_bonus = 0.0
-            if audio_peaks:
+            if isinstance(audio_peaks, (list, tuple)):
                 # Ignore malformed detector output without losing transcript candidates.
                 # Never coerce booleans, strings, NaN or infinite peak values.
                 bonus = 0.0

@@ -21,6 +21,7 @@ def test_no_secrets_or_model_loading(monkeypatch, capsys):
     monkeypatch.setenv("AI_ENABLED", "true")
     monkeypatch.setenv("SECRET_KEY", "do-not-print-this")
     monkeypatch.setattr("scripts.check_ai_runtime.inspect_runtime", lambda: (True, False))
+    monkeypatch.setattr("scripts.check_ai_runtime.inspect_media_tools", lambda: (True, True))
     assert main() == 1
     output = capsys.readouterr().out
     assert "faster-whisper is missing" in output
@@ -68,3 +69,21 @@ def test_disabled_ai_reports_missing_tools_without_failure(monkeypatch, capsys):
     monkeypatch.setattr("scripts.check_ai_runtime.inspect_media_tools", lambda: (False, False))
     assert main() == 0
     assert "FFprobe installed: no" in capsys.readouterr().out
+
+
+def test_enabled_ai_missing_both_dependencies_reports_media_failure(monkeypatch, capsys):
+    monkeypatch.setenv("AI_ENABLED", "true")
+    monkeypatch.setattr("scripts.check_ai_runtime.inspect_runtime", lambda: (True, False))
+    monkeypatch.setattr("scripts.check_ai_runtime.inspect_media_tools", lambda: (False, False))
+    assert main() == 1
+    output = capsys.readouterr().out
+    assert "FFmpeg and FFprobe" in output
+    assert "faster-whisper installed: no" in output
+
+
+def test_enabled_ai_missing_whisper_with_media_available(monkeypatch, capsys):
+    monkeypatch.setenv("AI_ENABLED", "true")
+    monkeypatch.setattr("scripts.check_ai_runtime.inspect_runtime", lambda: (True, False))
+    monkeypatch.setattr("scripts.check_ai_runtime.inspect_media_tools", lambda: (True, True))
+    assert main() == 1
+    assert "faster-whisper is missing" in capsys.readouterr().out

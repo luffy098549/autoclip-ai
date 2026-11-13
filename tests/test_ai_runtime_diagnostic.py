@@ -87,3 +87,28 @@ def test_enabled_ai_missing_whisper_with_media_available(monkeypatch, capsys):
     monkeypatch.setattr("scripts.check_ai_runtime.inspect_media_tools", lambda: (True, True))
     assert main() == 1
     assert "faster-whisper is missing" in capsys.readouterr().out
+
+
+def test_media_lookup_os_error_isolated_per_binary():
+    def lookup(binary):
+        if binary == "ffmpeg":
+            raise OSError("unavailable")
+        return "/usr/bin/ffprobe"
+    assert inspect_media_tools(lookup) == (False, True)
+
+
+def test_media_lookup_invalid_type_is_handled():
+    def lookup(_binary):
+        raise TypeError("invalid path")
+    assert inspect_media_tools(lookup) == (False, False)
+
+
+def test_nonstring_ai_enabled_does_not_crash(monkeypatch, capsys):
+    class WeirdEnvironment(dict):
+        def get(self, key, default=None):
+            if key == "AI_ENABLED":
+                return 42
+            return super().get(key, default)
+    monkeypatch.setattr("scripts.check_ai_runtime.os.environ", WeirdEnvironment())
+    assert main() == 2
+    assert "unrecognized value" in capsys.readouterr().out

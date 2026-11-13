@@ -6,6 +6,7 @@ No model downloads, credentials, or network calls are performed.
 import importlib.util
 import os
 import sys
+import shutil
 
 
 def inspect_runtime(find_spec=importlib.util.find_spec, environ=None):
@@ -18,6 +19,11 @@ def inspect_runtime(find_spec=importlib.util.find_spec, environ=None):
     return enabled, installed
 
 
+def inspect_media_tools(which=shutil.which):
+    """Report only executable availability; never invoke external programs."""
+    return which("ffmpeg") is not None, which("ffprobe") is not None
+
+
 def main():
     raw_setting = os.environ.get("AI_ENABLED", "false").strip().lower()
     if raw_setting not in {"1", "true", "yes", "on", "0", "false", "no", "off", ""}:
@@ -26,6 +32,12 @@ def main():
     enabled, installed = inspect_runtime()
     print("AI_ENABLED:", "true" if enabled else "false")
     print("faster-whisper installed:", "yes" if installed else "no")
+    ffmpeg, ffprobe = inspect_media_tools()
+    print("FFmpeg installed:", "yes" if ffmpeg else "no")
+    print("FFprobe installed:", "yes" if ffprobe else "no")
+    if enabled and not (ffmpeg and ffprobe):
+        print("ERROR: AI processing requires FFmpeg and FFprobe executables.")
+        return 1
     if enabled and not installed:
         print("ERROR: AI_ENABLED is true but faster-whisper is missing.")
         print("Rebuild the worker with INSTALL_AI=true; do not use pip install in a running container.")

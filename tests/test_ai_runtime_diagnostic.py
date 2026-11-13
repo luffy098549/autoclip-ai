@@ -132,3 +132,12 @@ def test_enabled_ai_missing_media_but_whisper_present(monkeypatch, capsys):
     output = capsys.readouterr().out
     assert "FFmpeg and FFprobe executables" in output
     assert "faster-whisper is missing" not in output
+
+
+def test_empty_executable_lookup_is_unavailable():
+    """An empty lookup result must not be treated as an installed executable."""
+    assert inspect_media_tools(lambda _name: "") == (False, False)
+
+
+def test_one_empty_executable_lookup_does_not_hide_other_tool():
+    assert inspect_media_tools(lambda name: "" if name == "ffmpeg" else "/usr/bin/ffprobe") == (False, True)

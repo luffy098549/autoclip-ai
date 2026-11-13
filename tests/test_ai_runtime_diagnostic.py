@@ -31,3 +31,18 @@ def test_installed_runtime_is_not_claimed_model_ready(monkeypatch, capsys):
     monkeypatch.setattr("scripts.check_ai_runtime.inspect_runtime", lambda: (True, True))
     assert main() == 0
     assert "NOT verified" in capsys.readouterr().out
+
+
+def test_invalid_ai_enabled_fails_closed(monkeypatch, capsys):
+    monkeypatch.setenv("AI_ENABLED", "tru")
+    monkeypatch.setenv("SECRET_KEY", "never-echo-secret")
+    assert main() == 2
+    output = capsys.readouterr().out
+    assert "unrecognized value" in output
+    assert "never-echo-secret" not in output
+
+
+def test_os_error_during_dependency_lookup_is_handled():
+    def broken(_name):
+        raise OSError("package metadata inaccessible")
+    assert inspect_runtime(broken, {"AI_ENABLED": "true"}) == (True, False)

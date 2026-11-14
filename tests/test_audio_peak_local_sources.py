@@ -51,10 +51,31 @@ def test_protocol_like_local_filename_still_uses_restricted_protocols(monkeypatc
     with pytest.raises(RuntimeError, match="mock FFmpeg"):
         audio_peaks.detect_audio_peaks(audio)
     assert commands
-    assert commands[0][commands[0].index("-protocol_whitelist") + 1] == "file,pipe"
+    assert commands[0][commands[0].index("-protocol_whitelist") + 1] == "file,pipe"\n    assert commands[0][commands[0].index("-i") + 1] == str(audio.resolve())
 
 
 def test_nul_path_rejected_before_ffmpeg(monkeypatch, tmp_path):
     monkeypatch.setattr(audio_peaks.subprocess, "Popen", lambda *a, **k: pytest.fail("FFmpeg started"))
     with pytest.raises(ValueError, match="Invalid audio path"):
         audio_peaks.detect_audio_peaks(str(tmp_path / "audio") + chr(0) + ".wav")
+
+
+def test_relative_protocol_like_name_is_converted_to_absolute_path(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "concat:local.wav").write_bytes(b"RIFF")
+    commands = []
+    def fake_popen(command, **kwargs):
+        commands.append(command)
+        raise RuntimeError("mock FFmpeg")
+    monkeypatch.setattr(audio_peaks.subprocess, "Popen", fake_popen)
+    with pytest.raises(RuntimeError, match="mock FFmpeg"):
+        audio_peaks.detect_audio_peaks("concat:local.wav")
+    assert commands[0][commands[0].index("-i") + 1] == str(tmp_path / "concat:local.wav")
+
+
+def test_embedded_nul_in_existing_path_is_rejected(monkeypatch, tmp_path):
+    audio = tmp_path / "valid.wav"
+    audio.write_bytes(b"RIFF")
+    monkeypatch.setattr(audio_peaks.subprocess, "Popen", lambda *a, **k: pytest.fail("FFmpeg started"))
+    with pytest.raises(ValueError, match="Invalid audio path"):
+        audio_peaks.detect_audio_peaks(str(audio) + chr(0))

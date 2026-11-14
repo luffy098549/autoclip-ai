@@ -1,0 +1,31 @@
+"""Guard numeric boundaries against Python integer-to-float overflow."""
+import pytest
+
+from app.intelligence.highlights import score_candidates
+
+
+SEGMENT = {"start": 0, "end": 20, "text": " ".join(f"word{i}" for i in range(30))}
+HUGE = 10 ** 1000
+
+
+@pytest.mark.parametrize("field", ["minimum_seconds", "maximum_seconds"])
+def test_huge_duration_setting_is_rejected(field):
+    with pytest.raises(ValueError, match="Invalid duration constraints"):
+        score_candidates([SEGMENT], **{field: HUGE})
+
+
+@pytest.mark.parametrize("field", ["start", "end"])
+def test_huge_transcript_timestamp_is_ignored(field):
+    invalid = {**SEGMENT, field: HUGE}
+    assert score_candidates([invalid, SEGMENT]) == score_candidates([SEGMENT])
+
+
+@pytest.mark.parametrize("peak", [(HUGE, 1.0), (1.0, HUGE), (-HUGE, 0.5)])
+def test_huge_audio_peak_is_ignored(peak):
+    assert score_candidates([SEGMENT], audio_peaks=[peak]) == score_candidates([SEGMENT])
+
+
+def test_normal_numeric_peak_still_increases_score():
+    baseline = score_candidates([SEGMENT])[0].score
+    boosted = score_candidates([SEGMENT], audio_peaks=[(1, 0.5)])[0].score
+    assert boosted == pytest.approx(min(100.0, baseline + 2.0))

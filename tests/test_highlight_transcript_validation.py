@@ -113,7 +113,7 @@ def test_nested_segments_below_scoring_threshold_are_not_returned():
     assert score_candidates([outer, inner], minimum_seconds=18, maximum_seconds=35) == []
 
 
-def test_many_nested_segments_preserve_furthest_coverage_end():
+def test_many_nested_segments_preserve_furthest_coverage_end(monkeypatch):
     """Nested captions must not make a connected later segment look disconnected."""
     outer = {"start": 0.0, "end": 25.0,
              "text": "wow !!! " + " ".join(f"word{i}" for i in range(30))}
@@ -121,6 +121,10 @@ def test_many_nested_segments_preserve_furthest_coverage_end():
                "text": "caption"} for i in range(100)]
     following = {"start": 27.0, "end": 40.0,
                  "text": " ".join(f"later{i}" for i in range(20))}
+    # Inspect generated windows before non-overlap ranking discards lower-scored ones.
+    # A valid 0-40 window need not be the highest-ranked selected clip.
+    monkeypatch.setattr("app.intelligence.highlights.select_candidates",
+                        lambda candidates, **kwargs: candidates)
     candidates = score_candidates([outer, *nested, following],
                                   minimum_seconds=18, maximum_seconds=50)
     assert any(c.start == 0.0 and c.end == 40.0 for c in candidates)

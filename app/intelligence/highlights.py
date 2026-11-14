@@ -44,13 +44,16 @@ def score_candidates(transcript_segments: list[dict], *,
     for i, begin in enumerate(segments):
         start = float(begin["start"])
         covered = []
+        covered_end = start
         for segment in segments[i:]:
-            if covered and float(segment["start"]) - max(float(item["end"]) for item in covered) > 4:
+            # Track the furthest end: nested/overlapping segments may finish earlier.
+            if covered and float(segment["start"]) - covered_end > 4:
                 break
-            end = max(float(segment["end"]), float(covered[-1]["end"]) if covered else start)
+            end = max(float(segment["end"]), covered_end)
             if end - start > maximum_seconds:
                 break
             covered.append(segment)
+            covered_end = end
             span = end - start
             if span < minimum_seconds:
                 continue

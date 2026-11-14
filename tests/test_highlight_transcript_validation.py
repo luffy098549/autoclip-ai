@@ -62,3 +62,26 @@ def test_nested_segment_does_not_create_false_gap_before_next_segment():
     following = {"start": 27.0, "end": 40.0, "text": " ".join(f"later{i}" for i in range(20))}
     candidates = score_candidates([outer, inner, following], minimum_seconds=18, maximum_seconds=50)
     assert any(candidate.start == 0.0 and candidate.end == 40.0 for candidate in candidates)
+
+
+@pytest.mark.parametrize("cue,embedded", [
+    ("wait", "awaiting"),
+    ("wow", "wowzers"),
+    ("bro", "broad"),
+])
+def test_cue_matches_whole_word_not_substring(cue, embedded):
+    filler = " ".join(f"word{i}" for i in range(30))
+    isolated = {"start": 0, "end": 20, "text": filler + " " + cue}
+    inside_word = {"start": 0, "end": 20, "text": filler + " " + embedded}
+    cue_candidates = score_candidates([isolated])
+    embedded_candidates = score_candidates([inside_word])
+    assert cue_candidates and embedded_candidates
+    assert cue_candidates[0].score > embedded_candidates[0].score
+
+
+def test_multiword_cue_requires_word_boundaries():
+    filler = " ".join(f"word{i}" for i in range(30))
+    isolated = score_candidates([{"start": 0, "end": 20, "text": filler + " no way"}])
+    embedded = score_candidates([{"start": 0, "end": 20, "text": filler + " know ways"}])
+    assert isolated and embedded
+    assert isolated[0].score > embedded[0].score

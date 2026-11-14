@@ -85,3 +85,22 @@ def test_multiword_cue_requires_word_boundaries():
     embedded = score_candidates([{"start": 0, "end": 20, "text": filler + " know ways"}])
     assert isolated and embedded
     assert isolated[0].score > embedded[0].score
+
+
+@pytest.mark.parametrize("field,bad_value", [
+    ("minimum_seconds", True), ("minimum_seconds", "18"),
+    ("minimum_seconds", None), ("minimum_seconds", float("nan")),
+    ("minimum_seconds", float("inf")), ("minimum_seconds", 0),
+    ("maximum_seconds", False), ("maximum_seconds", "65"),
+    ("maximum_seconds", None), ("maximum_seconds", float("-inf")),
+    ("maximum_seconds", 0), ("max_clips", True),
+    ("max_clips", 2.0), ("max_clips", "5"),
+    ("max_clips", None), ("max_clips", 0), ("max_clips", 6),
+])
+def test_invalid_scoring_settings_raise_value_error(field, bad_value):
+    with pytest.raises(ValueError, match="Invalid duration constraints"):
+        score_candidates([VALID], **{field: bad_value})
+
+
+def test_valid_integer_and_float_durations_remain_supported():
+    assert score_candidates([VALID], minimum_seconds=18, maximum_seconds=65.0, max_clips=5)

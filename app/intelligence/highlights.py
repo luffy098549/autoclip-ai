@@ -10,15 +10,24 @@ CUES = {
 }
 
 
+def _finite_number(value):
+    """Accept finite built-in numbers without coercing booleans or huge integers."""
+    if type(value) not in (int, float):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
+
+
 def score_candidates(transcript_segments: list[dict], *,
                      minimum_seconds: float = 18,
                      maximum_seconds: float = 65,
                      max_clips: int = 5,
                      audio_peaks: list[tuple[float, float]] | None = None) -> list[Candidate]:
     """Return nonoverlapping candidate windows from timed text; scoring is experimental."""
-    if (any(type(x) not in (int, float) for x in (minimum_seconds, maximum_seconds))
+    if (not all(_finite_number(x) for x in (minimum_seconds, maximum_seconds))
             or type(max_clips) is not int
-            or not all(math.isfinite(x) for x in (minimum_seconds, maximum_seconds))
             or minimum_seconds <= 0 or maximum_seconds < minimum_seconds
             or not 1 <= max_clips <= 5):
         raise ValueError("Invalid duration constraints")
@@ -28,7 +37,7 @@ def score_candidates(transcript_segments: list[dict], *,
     for segment in transcript_segments:
         if not isinstance(segment, dict):
             continue
-        if type(segment.get("start")) not in (int, float) or type(segment.get("end")) not in (int, float):
+        if not _finite_number(segment.get("start")) or not _finite_number(segment.get("end")):
             continue
         if not isinstance(segment.get("text", ""), str):
             continue
@@ -77,10 +86,7 @@ def score_candidates(transcript_segments: list[dict], *,
                     if not isinstance(peak, (tuple, list)) or len(peak) != 2:
                         continue
                     timestamp, strength = peak
-                    if (type(timestamp) not in (int, float)
-                            or type(strength) not in (int, float)
-                            or not math.isfinite(timestamp)
-                            or not math.isfinite(strength)):
+                    if not _finite_number(timestamp) or not _finite_number(strength):
                         continue
                     if start <= timestamp < end:
                         bonus += min(1.0, max(0.0, strength)) * 4.0

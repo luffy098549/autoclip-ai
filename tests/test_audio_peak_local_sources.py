@@ -51,7 +51,8 @@ def test_protocol_like_local_filename_still_uses_restricted_protocols(monkeypatc
     with pytest.raises(RuntimeError, match="mock FFmpeg"):
         audio_peaks.detect_audio_peaks(audio)
     assert commands
-    assert commands[0][commands[0].index("-protocol_whitelist") + 1] == "file,pipe"\n    assert commands[0][commands[0].index("-i") + 1] == str(audio.resolve())
+    assert commands[0][commands[0].index("-protocol_whitelist") + 1] == "file,pipe"
+    assert commands[0][commands[0].index("-i") + 1] == str(audio.resolve())
 
 
 def test_nul_path_rejected_before_ffmpeg(monkeypatch, tmp_path):

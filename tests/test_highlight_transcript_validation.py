@@ -49,7 +49,7 @@ def test_nested_transcript_segment_never_shrinks_candidate_window(nested_end):
 
 
 def test_nested_segments_do_not_create_negative_or_short_windows():
-    outer = {"start": 0.0, "end": 30.0, "text": " ".join(f"word{i}" for i in range(30))}
+    outer = {"start": 0.0, "end": 30.0, "text": "wow " + " ".join(f"word{i}" for i in range(30))}
     inner = {"start": 2.0, "end": 3.0, "text": "extra words"}
     candidates = score_candidates([outer, inner], minimum_seconds=18, maximum_seconds=35)
     assert candidates

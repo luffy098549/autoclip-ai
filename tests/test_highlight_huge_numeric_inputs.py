@@ -29,3 +29,16 @@ def test_normal_numeric_peak_still_increases_score():
     baseline = score_candidates([SEGMENT])[0].score
     boosted = score_candidates([SEGMENT], audio_peaks=[(1, 0.5)])[0].score
     assert boosted == pytest.approx(min(100.0, baseline + 2.0))
+
+def test_mixed_peak_inputs_preserve_valid_peak_scoring():
+    valid = [(1.0, 0.5), (3, 1.0), (30, 1.0)]
+    mixed = [None, "invalid", (1,), (True, 1.0), (2, float("nan")), *valid]
+    assert score_candidates([SEGMENT], audio_peaks=mixed) == score_candidates(
+        [SEGMENT], audio_peaks=valid
+    )
+
+
+def test_many_invalid_peaks_do_not_change_candidate_score():
+    baseline = score_candidates([SEGMENT])
+    malformed = [(float("inf"), 1.0), (1.0, float("nan")), None] * 100
+    assert score_candidates([SEGMENT], audio_peaks=malformed) == baseline

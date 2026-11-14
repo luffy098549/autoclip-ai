@@ -20,9 +20,16 @@ def test_invalid_evidence_is_denied_without_exception(status, evidence):
     assert decision.reason == "Valid permission evidence required before processing"
 
 
+@pytest.mark.parametrize("evidence", ["\u200b", "\u200d", "\ufeff", "🔒", "—", "N/A", "n/a", "none", "NULL", "unknown", "TBD"])
 @pytest.mark.parametrize("status", ["owned", "licensed"])
-def test_supported_status_with_nonempty_evidence_is_allowed(status):
-    assert assess_rights(status, "  original recording  ").allowed
+def test_invisible_or_placeholder_evidence_is_denied(status, evidence):
+    assert not assess_rights(status, evidence).allowed
+
+
+@pytest.mark.parametrize("evidence", ["  original recording  ", "license agreement #123", "© creator 2026", "https://example.org/license/123"])
+@pytest.mark.parametrize("status", ["owned", "licensed"])
+def test_substantive_evidence_is_accepted(status, evidence):
+    assert assess_rights(status, evidence).allowed
 
 
 @pytest.mark.parametrize("status", ["denied", "unverified"])

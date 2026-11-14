@@ -36,11 +36,11 @@ def detect_audio_peaks(path: str, *, interval_seconds: float = 1.0,
     try:
         local_path = os.fspath(path)
         if (not isinstance(local_path, str) or not local_path.strip()
-                or "\\x00" in local_path or not os.path.isfile(local_path)):
+                or chr(0) in local_path or not os.path.isfile(local_path)):
             raise ValueError("Invalid audio path")
     except (OSError, TypeError, ValueError):
         raise ValueError("Invalid audio path") from None
-    sample_rate = 8000
+    # Resolve to an absolute filesystem path: FFmpeg treats relative names such as\n    # concat:local.wav as protocols even when a file with that name exists.\n    local_path = os.path.abspath(local_path)\n    sample_rate = 8000
     chunk_bytes = int(sample_rate * interval_seconds) * 2
     command = [
         "ffmpeg", "-nostdin", "-v", "error",

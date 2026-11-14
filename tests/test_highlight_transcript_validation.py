@@ -54,3 +54,11 @@ def test_nested_segments_do_not_create_negative_or_short_windows():
     candidates = score_candidates([outer, inner], minimum_seconds=18, maximum_seconds=35)
     assert candidates
     assert all(candidate.end > candidate.start for candidate in candidates)
+
+
+def test_nested_segment_does_not_create_false_gap_before_next_segment():
+    outer = {"start": 0.0, "end": 25.0, "text": " ".join(f"word{i}" for i in range(30))}
+    inner = {"start": 1.0, "end": 2.0, "text": "more words"}
+    following = {"start": 27.0, "end": 40.0, "text": " ".join(f"later{i}" for i in range(20))}
+    candidates = score_candidates([outer, inner, following], minimum_seconds=18, maximum_seconds=50)
+    assert any(candidate.start == 0.0 and candidate.end == 40.0 for candidate in candidates)

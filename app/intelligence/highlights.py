@@ -50,14 +50,22 @@ def score_candidates(transcript_segments: list[dict], *,
         segments.append({"start": start, "end": end, "text": str(segment.get("text") or "")})
     segments.sort(key=lambda x: x["start"])
     # Validate detector output once rather than for every candidate window.
-    valid_peaks = []
+    # A detector may report the same instant more than once. Count each
+    # timestamp only once, retaining its strongest valid observation.
+    peaks_by_time = {}
     if isinstance(audio_peaks, (list, tuple)):
         for peak in audio_peaks:
             if not isinstance(peak, (tuple, list)) or len(peak) != 2:
                 continue
             timestamp, strength = peak
-            if _finite_number(timestamp) and _finite_number(strength):
-                valid_peaks.append((timestamp, strength))
+            if not (_finite_number(timestamp) and _finite_number(strength)):
+                continue
+            if timestamp < 0 or strength <= 0:
+                continue
+            timestamp = float(timestamp)
+            strength = min(1.0, float(strength))
+            peaks_by_time[timestamp] = max(peaks_by_time.get(timestamp, 0.0), strength)
+    valid_peaks = list(peaks_by_time.items())
     out = []
     for i, begin in enumerate(segments):
         start = float(begin["start"])

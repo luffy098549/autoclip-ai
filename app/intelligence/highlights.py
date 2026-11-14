@@ -45,7 +45,7 @@ def score_candidates(transcript_segments: list[dict], *,
         for segment in segments[i:]:
             if covered and float(segment["start"]) - float(covered[-1]["end"]) > 4:
                 break
-            end = float(segment["end"])
+            end = max(float(segment["end"]), float(covered[-1]["end"]) if covered else start)
             if end - start > maximum_seconds:
                 break
             covered.append(segment)

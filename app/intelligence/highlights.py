@@ -58,7 +58,7 @@ def score_candidates(transcript_segments: list[dict], *,
                 continue
             lowered = text.casefold()
             cues = sum(1 for cue in CUES if re.search(
-                r"(?<!\\w)" + re.escape(cue) + r"(?!\\w)", lowered
+                r"(?<!\w)" + re.escape(cue) + r"(?!\w)", lowered
             ))
             expressions = min(4, text.count("!") + text.count("?") + text.count("¡") + text.count("¿"))
             density = len(words) / max(span, 1.0)

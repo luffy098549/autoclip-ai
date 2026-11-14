@@ -104,3 +104,10 @@ def test_invalid_scoring_settings_raise_value_error(field, bad_value):
 
 def test_valid_integer_and_float_durations_remain_supported():
     assert score_candidates([VALID], minimum_seconds=18, maximum_seconds=65.0, max_clips=5)
+
+
+def test_nested_segments_below_scoring_threshold_are_not_returned():
+    """Valid nested windows still need to satisfy the minimum highlight score."""
+    outer = {"start": 0.0, "end": 30.0, "text": " ".join(f"word{i}" for i in range(30))}
+    inner = {"start": 2.0, "end": 3.0, "text": "extra words"}
+    assert score_candidates([outer, inner], minimum_seconds=18, maximum_seconds=35) == []

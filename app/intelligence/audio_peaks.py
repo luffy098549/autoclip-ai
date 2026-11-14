@@ -5,6 +5,7 @@ energy changes, not emotions or guaranteed virality.
 """
 import array
 import math
+import os
 import subprocess
 import sys
 
@@ -28,10 +29,21 @@ def detect_audio_peaks(path: str, *, interval_seconds: float = 1.0,
         raise ValueError("Invalid interval_seconds")
     if not (math.isfinite(maximum_seconds) and 1 <= maximum_seconds <= 7200):
         raise ValueError("Invalid maximum_seconds")
+    # FFmpeg accepts network URLs and special input protocols. Only allow
+    # existing local regular files so an untrusted path cannot trigger fetches.
+    if not isinstance(path, (str, os.PathLike)):
+        raise ValueError("Invalid audio path")
+    try:
+        local_path = os.fspath(path)
+        if (not isinstance(local_path, str) or not local_path.strip()
+                or "\\x00" in local_path or not os.path.isfile(local_path)):
+            raise ValueError("Invalid audio path")
+    except (OSError, TypeError, ValueError):
+        raise ValueError("Invalid audio path") from None
     sample_rate = 8000
     chunk_bytes = int(sample_rate * interval_seconds) * 2
     command = [
-        "ffmpeg", "-nostdin", "-v", "error", "-i", path,
+        "ffmpeg", "-nostdin", "-v", "error", "-i", local_path,
         "-map", "0:a:0", "-vn", "-ac", "1", "-ar", str(sample_rate),
         "-t", str(maximum_seconds), "-f", "s16le", "pipe:1",
     ]

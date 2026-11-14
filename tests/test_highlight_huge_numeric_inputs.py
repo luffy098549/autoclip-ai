@@ -42,3 +42,26 @@ def test_many_invalid_peaks_do_not_change_candidate_score():
     baseline = score_candidates([SEGMENT])
     malformed = [(float("inf"), 1.0), (1.0, float("nan")), None] * 100
     assert score_candidates([SEGMENT], audio_peaks=malformed) == baseline
+
+
+def test_duplicate_peak_timestamps_count_only_once():
+    once = score_candidates([SEGMENT], audio_peaks=[(1, 0.5)])
+    repeated = score_candidates([SEGMENT], audio_peaks=[(1, 0.5)] * 20)
+    assert repeated == once
+
+
+def test_same_timestamp_uses_strongest_peak_independent_of_order():
+    strongest = score_candidates([SEGMENT], audio_peaks=[(1, 0.8)])
+    assert score_candidates([SEGMENT], audio_peaks=[(1, 0.2), (1, 0.8)]) == strongest
+    assert score_candidates([SEGMENT], audio_peaks=[(1, 0.8), (1, 0.2)]) == strongest
+
+
+def test_negative_and_zero_strength_peaks_do_not_affect_score():
+    baseline = score_candidates([SEGMENT])
+    assert score_candidates([SEGMENT], audio_peaks=[(-1, 1), (1, -2), (2, 0)]) == baseline
+
+
+def test_distinct_timestamps_still_contribute_independently():
+    one = score_candidates([SEGMENT], audio_peaks=[(1, 0.25)])[0].score
+    two = score_candidates([SEGMENT], audio_peaks=[(1, 0.25), (2, 0.25)])[0].score
+    assert two == pytest.approx(min(100.0, one + 1.0))

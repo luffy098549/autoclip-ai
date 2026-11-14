@@ -43,7 +43,8 @@ def detect_audio_peaks(path: str, *, interval_seconds: float = 1.0,
     sample_rate = 8000
     chunk_bytes = int(sample_rate * interval_seconds) * 2
     command = [
-        "ffmpeg", "-nostdin", "-v", "error", "-i", local_path,
+        "ffmpeg", "-nostdin", "-v", "error",
+        "-protocol_whitelist", "file,pipe", "-i", local_path,
         "-map", "0:a:0", "-vn", "-ac", "1", "-ar", str(sample_rate),
         "-t", str(maximum_seconds), "-f", "s16le", "pipe:1",
     ]

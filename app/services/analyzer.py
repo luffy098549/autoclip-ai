@@ -8,8 +8,10 @@ from ..intelligence.audio_peaks import detect_audio_peaks
 
 
 def analyze_source(source_id: int, *, model_size="small", max_clips=5):
-    if not 1 <= max_clips <= 5:
-        raise ValueError("max_clips must be between 1 and 5")
+    if type(source_id) is not int or source_id < 1:
+        raise ValueError("source_id must be a positive integer")
+    if type(max_clips) is not int or not 1 <= max_clips <= 5:
+        raise ValueError("max_clips must be an integer between 1 and 5")
     source = db.session.get(MediaSource, source_id)
     if not source:
         raise ValueError("Source does not exist")

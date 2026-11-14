@@ -49,6 +49,15 @@ def score_candidates(transcript_segments: list[dict], *,
             continue
         segments.append({"start": start, "end": end, "text": str(segment.get("text") or "")})
     segments.sort(key=lambda x: x["start"])
+    # Validate detector output once rather than for every candidate window.
+    valid_peaks = []
+    if isinstance(audio_peaks, (list, tuple)):
+        for peak in audio_peaks:
+            if not isinstance(peak, (tuple, list)) or len(peak) != 2:
+                continue
+            timestamp, strength = peak
+            if _finite_number(timestamp) and _finite_number(strength):
+                valid_peaks.append((timestamp, strength))
     out = []
     for i, begin in enumerate(segments):
         start = float(begin["start"])
@@ -77,20 +86,10 @@ def score_candidates(transcript_segments: list[dict], *,
             expressions = min(4, text.count("!") + text.count("?") + text.count("¡") + text.count("¿"))
             density = len(words) / max(span, 1.0)
             diversity = len(set(w.casefold() for w in words)) / len(words)
-            audio_bonus = 0.0
-            if isinstance(audio_peaks, (list, tuple)):
-                # Ignore malformed detector output without losing transcript candidates.
-                # Never coerce booleans, strings, NaN or infinite peak values.
-                bonus = 0.0
-                for peak in audio_peaks:
-                    if not isinstance(peak, (tuple, list)) or len(peak) != 2:
-                        continue
-                    timestamp, strength = peak
-                    if not _finite_number(timestamp) or not _finite_number(strength):
-                        continue
-                    if start <= timestamp < end:
-                        bonus += min(1.0, max(0.0, strength)) * 4.0
-                audio_bonus = min(12.0, bonus)
+            audio_bonus = min(12.0, sum(
+                min(1.0, max(0.0, strength)) * 4.0
+                for timestamp, strength in valid_peaks if start <= timestamp < end
+            ))
             score = min(100.0, 48 + min(cues, 4) * 6 + expressions * 3
                         + min(1.8, density) * 5 + diversity * 11 + audio_bonus)
             out.append(Candidate(start, end, round(score, 1),

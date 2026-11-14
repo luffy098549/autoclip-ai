@@ -25,10 +25,10 @@ def _rms_s16le(data: bytes) -> int:
 def detect_audio_peaks(path: str, *, interval_seconds: float = 1.0,
                        maximum_seconds: float = 7200.0) -> list[tuple[float, float]]:
     if (isinstance(interval_seconds, bool) or not isinstance(interval_seconds, (int, float))
-            or not math.isfinite(interval_seconds) or not 0.1 <= interval_seconds <= 10):
+            or not 0.1 <= interval_seconds <= 10 or not math.isfinite(interval_seconds)):
         raise ValueError("Invalid interval_seconds")
     if (isinstance(maximum_seconds, bool) or not isinstance(maximum_seconds, (int, float))
-            or not math.isfinite(maximum_seconds) or not 1 <= maximum_seconds <= 7200):
+            or not 1 <= maximum_seconds <= 7200 or not math.isfinite(maximum_seconds)):
         raise ValueError("Invalid maximum_seconds")
     sample_rate = 8000
     chunk_bytes = int(sample_rate * interval_seconds) * 2

@@ -21,7 +21,15 @@ def score_candidates(transcript_segments: list[dict], *,
             or not 1 <= max_clips <= 5):
         raise ValueError("Invalid duration constraints")
     segments = []
+    if not isinstance(transcript_segments, (list, tuple)):
+        return []
     for segment in transcript_segments:
+        if not isinstance(segment, dict):
+            continue
+        if type(segment.get("start")) not in (int, float) or type(segment.get("end")) not in (int, float):
+            continue
+        if not isinstance(segment.get("text", ""), str):
+            continue
         try:
             start, end = float(segment["start"]), float(segment["end"])
         except (KeyError, TypeError, ValueError, OverflowError):

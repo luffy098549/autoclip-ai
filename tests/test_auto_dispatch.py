@@ -23,3 +23,24 @@ def test_selection_avoids_overlapping_clips():
         SimpleNamespace(id=1, source_id=1, start_seconds=5, end_seconds=20, score=72.1),
     ]
     assert [c.clip_id for c in select_daily_clips(clips)] == [2, 1]
+
+
+def test_enabled_dispatch_requires_explicit_audience_before_database_access():
+    app = Flask(__name__)
+    app.config["AUTO_PUBLISH_YOUTUBE_PRIVATE"] = True
+    with app.app_context():
+        with patch("app.services.auto_dispatch.db") as db:
+            result = dispatch_due()
+            assert result == {
+                "skipped": True,
+                "reason": "YouTube audience classification required",
+            }
+            db.engine.assert_not_called()
+
+
+def test_audience_setting_parses_only_explicit_boolean(monkeypatch):
+    from app import create_app
+    for raw, expected in [("", None), ("unknown", None), ("true", True), ("FALSE", False)]:
+        monkeypatch.setenv("YOUTUBE_SCHEDULED_MADE_FOR_KIDS", raw)
+        app = create_app({"TESTING": True})
+        assert app.config["YOUTUBE_SCHEDULED_MADE_FOR_KIDS"] is expected

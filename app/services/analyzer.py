@@ -23,7 +23,8 @@ def _validate_transcription(result):
         raise ValueError("Transcription must be a mapping")
     language = result.get("language")
     segments = result.get("segments")
-    if (not isinstance(language, str) or not language.strip() or len(language) > 20\n            or any(ord(char) < 32 or ord(char) == 127 for char in language)):
+    if (not isinstance(language, str) or not language.strip() or len(language) > 20
+            or any(ord(char) < 32 or ord(char) == 127 for char in language)):
         raise ValueError("Invalid transcription language")
     if not isinstance(segments, (list, tuple)):
         raise ValueError("Transcription segments must be a sequence")

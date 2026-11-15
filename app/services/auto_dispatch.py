@@ -6,7 +6,6 @@ TikTok and Instagram remain planned until their official integrations exist.
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import text
 from ..models import db, Publication, Clip, MediaSource
 from ..services.rights import assess_rights
 from ..quality import validate_render
@@ -29,8 +28,14 @@ def dispatch_due(*, now=None, max_items=5):
              .order_by(Publication.scheduled_at, Publication.id))
     if db.engine.dialect.name == "postgresql":
         query = query.with_for_update(skip_locked=True)
-    due = query.limit(max_items).all()
-    for item in due:
+    # Claim one row at a time; commit the claim before network I/O.
+    for _ in range(max_items):
+        item = query.first()
+        if item is None:
+            break
+        item.state = "publishing"
+        db.session.commit()
+
         clip = db.session.get(Clip, item.clip_id)
         source = db.session.get(MediaSource, clip.source_id) if clip else None
         if not clip or clip.editorial_status != "ready" or not clip.output_path or not source:
@@ -59,6 +64,8 @@ def dispatch_due(*, now=None, max_items=5):
             continue
         token = Path(current_app.config["MEDIA_ROOT"]) / "private" / "youtube-token.json"
         if not token.is_file():
+            item.state = "planned"
+            db.session.commit()
             results.append({"publication_id": item.id, "state": "waiting_for_youtube"})
             continue
         # Do not send a clip twice even if it has another planned row.
@@ -73,8 +80,6 @@ def dispatch_due(*, now=None, max_items=5):
             db.session.commit()
             results.append({"publication_id": item.id, "state": "blocked_duplicate"})
             continue
-        item.state = "publishing"
-        db.session.commit()
         try:
             from ..publishers.youtube import upload_short
             video_id = upload_short(

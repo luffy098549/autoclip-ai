@@ -1,5 +1,15 @@
 """Regression tests for cue-word boundaries in highlight scoring."""
+from app.intelligence import highlights
 from app.intelligence.highlights import score_candidates
+
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def inspect_all_candidates(monkeypatch):
+    """Inspect raw heuristic scores before threshold-based selection."""
+    monkeypatch.setattr(highlights, "select_candidates", lambda candidates, **kwargs: candidates)
 
 
 def _score(text):

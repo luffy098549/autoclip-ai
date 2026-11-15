@@ -85,7 +85,11 @@ def daily_auto_plan_task():
     with app.app_context():
         if not app.config.get("AUTO_PLANNING_ENABLED") or app.config.get("READ_ONLY_DEPLOYMENT"):
             return {"skipped": True, "reason": "AUTO_PLANNING_ENABLED is off"}
-        return build_daily_plan(platforms=("youtube", "tiktok", "instagram"), dry_run=False)
+        from .services.score_backfill import score_existing_clips
+        scores = score_existing_clips(limit=100)
+        plan = build_daily_plan(platforms=("youtube", "tiktok", "instagram"), dry_run=False)
+        plan["score_backfill"] = scores
+        return plan
 
 
 # Celery Beat evaluates the planner once a day in New York time.

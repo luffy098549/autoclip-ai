@@ -6,7 +6,7 @@ from app.services.analyzer import _validate_source_path
 
 @pytest.mark.parametrize("source_uri", [
     None, "", "   ", 0, False, [], {}, b"/tmp/video.mp4",
-    "missing.mp4", "https://example.invalid/video.mp4", "bad\\x00path",
+    "missing.mp4", "https://example.invalid/video.mp4", "bad" + chr(0) + "path",
 ])
 def test_invalid_source_path_rejected(source_uri):
     with pytest.raises((ValueError, FileNotFoundError)):

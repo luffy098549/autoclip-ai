@@ -18,9 +18,13 @@ def _validate_transcription(result):
         if not isinstance(segment, dict):
             raise ValueError("Invalid transcription segment")
         start, end, text = (segment.get(key) for key in ("start", "end", "text"))
-        if (type(start) not in (int, float) or type(end) not in (int, float)
-                or not math.isfinite(start) or not math.isfinite(end)
-                or start < 0 or end <= start):
+        if type(start) not in (int, float) or type(end) not in (int, float):
+            raise ValueError("Invalid transcription timestamps")
+        try:
+            start, end = float(start), float(end)
+        except (OverflowError, ValueError):
+            raise ValueError("Invalid transcription timestamps") from None
+        if not math.isfinite(start) or not math.isfinite(end) or start < 0 or end <= start:
             raise ValueError("Invalid transcription timestamps")
         if not isinstance(text, str) or not text.strip():
             raise ValueError("Invalid transcription text")

@@ -68,13 +68,11 @@ def youtube_callback():
         return jsonify(error="Google no autorizó la conexión"), 400
     try:
         flow = _youtube_flow()
-        # Never trust an arbitrary Host header as an OAuth redirect URI.
-        redirect_uri = flow.redirect_uri
-        # Codespaces terminates HTTPS at a reverse proxy; Flask may see HTTP.
-        # Validate host and path against the configured external redirect URI.
-        configured = urlsplit(redirect_uri)
-        if request.host.lower() != configured.netloc.lower() or request.path != configured.path:
-            return jsonify(error="URL de retorno no coincide con la configurada"), 400
+        # The external HTTPS redirect URI comes exclusively from trusted
+        # configuration. Codespaces may replace Host and scheme internally,
+        # so never compare the proxy-facing Host to the public redirect host.
+        # Flask routing ensures this callback path; OAuth state is verified
+        # above, and the token exchange uses the fixed configured redirect URI.
         # The configured HTTPS redirect URI is used during token exchange.
         code = request.args.get("code")
         if not code:

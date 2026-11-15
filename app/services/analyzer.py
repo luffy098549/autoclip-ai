@@ -5,14 +5,15 @@ import math
 
 def _validate_source_path(source_uri):
     """Accept only existing local video files, without leaking their paths."""
-    if not isinstance(source_uri, str) or not source_uri.strip() or "\\x00" in source_uri:
+    if not isinstance(source_uri, str) or not source_uri.strip() or chr(0) in source_uri:
         raise ValueError("Invalid local source path")
     try:
         source = Path(source_uri)
-        if not source.is_file():
-            raise FileNotFoundError("Source video is missing")
+        is_file = source.is_file()
     except (OSError, ValueError):
         raise ValueError("Invalid local source path") from None
+    if not is_file:
+        raise FileNotFoundError("Source video is missing")
     return source
 
 

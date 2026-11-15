@@ -3,6 +3,20 @@ from pathlib import Path
 import math
 
 
+def _validate_source_path(source_uri):
+    """Accept only existing local video files, without leaking their paths."""
+    if not isinstance(source_uri, str) or not source_uri.strip() or chr(0) in source_uri:
+        raise ValueError("Invalid local source path")
+    try:
+        source = Path(source_uri)
+        is_file = source.is_file()
+    except (OSError, ValueError):
+        raise ValueError("Invalid local source path") from None
+    if not is_file:
+        raise FileNotFoundError("Source video is missing")
+    return source
+
+
 def _validate_transcription(result):
     """Validate model output before persisting any transcript rows."""
     if not isinstance(result, dict):
@@ -49,8 +63,7 @@ def analyze_source(source_id: int, *, model_size="small", max_clips=5):
         raise ValueError("Source does not exist")
     if not assess_rights(source.rights_status, source.permission_evidence).allowed:
         raise PermissionError("Rights must be confirmed before transcription")
-    if not Path(source.source_uri).is_file():
-        raise FileNotFoundError("Source video is missing")
+    _validate_source_path(source.source_uri)
     try:
         transcript = TranscriptSegment.query.filter_by(source_id=source.id).order_by(
             TranscriptSegment.start_seconds).all()

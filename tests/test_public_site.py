@@ -57,3 +57,25 @@ def test_verification_rejects_invalid_configuration(monkeypatch):
     monkeypatch.setenv("TIKTOK_VERIFICATION_CONTENT", "line1\nline2")
     with app.test_client() as client:
         assert client.get("/tiktok-check.txt").status_code == 404
+
+
+def test_verification_never_serves_other_files(monkeypatch):
+    monkeypatch.setenv("TIKTOK_VERIFICATION_FILENAME", "tiktok-verify.txt")
+    monkeypatch.setenv("TIKTOK_VERIFICATION_CONTENT", "safe-token-123")
+    app = create_app({"TESTING": True, "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:"})
+    with app.test_client() as client:
+        for path in ("/.env", "/README.md", "/tiktok-verify.txt/", "/tiktok-verify.txt.bak"):
+            assert client.get(path).status_code == 404
+        response = client.get("/tiktok-verify.txt")
+        assert response.status_code == 200
+        assert response.data == b"safe-token-123\n"
+        assert response.headers["X-Content-Type-Options"] == "nosniff"
+
+
+def test_verification_rejects_control_characters(monkeypatch):
+    monkeypatch.setenv("TIKTOK_VERIFICATION_FILENAME", "verify.txt")
+    app = create_app({"TESTING": True, "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:"})
+    with app.test_client() as client:
+        for invalid in ("abc\nxyz", "abc\rxyz", "<script>", "token with spaces"):
+            monkeypatch.setenv("TIKTOK_VERIFICATION_CONTENT", invalid)
+            assert client.get("/verify.txt").status_code == 404

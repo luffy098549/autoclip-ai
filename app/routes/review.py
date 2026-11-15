@@ -84,3 +84,25 @@ def youtube_preflight(clip_id):
                    privacy="private", uploaded=bool(upload_record and upload_record.state == "published"),
                    upload_state=upload_record.state if upload_record else None,
                    note="Solo comprobación local. No envía datos ni videos a YouTube.")
+
+
+@review_bp.route("/review/auto-plan", methods=["GET", "POST"])
+@admin_only
+def auto_plan():
+    """Preview or create up to five local plans per platform; never uploads."""
+    from datetime import date
+    from ..services.auto_planner import build_daily_plan
+    data = request.get_json(silent=True) or {} if request.method == "POST" else request.args
+    try:
+        day = date.fromisoformat(str(data.get("date"))) if data.get("date") else None
+        limit = int(data.get("limit", 5))
+        platforms = data.get("platforms", ["youtube"])
+        if isinstance(platforms, str):
+            platforms = [p.strip() for p in platforms.split(",") if p.strip()]
+        if not isinstance(platforms, list):
+            raise ValueError("platforms must be a list")
+        result = build_daily_plan(date=day, limit=limit, platforms=tuple(platforms),
+                                  dry_run=request.method == "GET")
+    except (ValueError, TypeError) as exc:
+        return jsonify(error=str(exc)), 400
+    return jsonify(result), (201 if request.method == "POST" else 200)

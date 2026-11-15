@@ -47,40 +47,44 @@ def analyze_source(source_id: int, *, model_size="small", max_clips=5):
         raise PermissionError("Rights must be confirmed before transcription")
     if not Path(source.source_uri).is_file():
         raise FileNotFoundError("Source video is missing")
-    transcript = TranscriptSegment.query.filter_by(source_id=source.id).order_by(
-        TranscriptSegment.start_seconds).all()
-    if not transcript:
-        result = transcribe_file(source.source_uri, model_size=model_size)
-        language, segments = _validate_transcription(result)
-        for start, end, text in segments:
-            db.session.add(TranscriptSegment(
-                source_id=source.id, start_seconds=start, end_seconds=end,
-                text=text, language=language))
-        db.session.commit()
+    try:
         transcript = TranscriptSegment.query.filter_by(source_id=source.id).order_by(
             TranscriptSegment.start_seconds).all()
-    try:
-        audio_peaks = detect_audio_peaks(source.source_uri)
-    except (OSError, RuntimeError, ValueError):
-        audio_peaks = []  # Transcript-only scoring remains available.
-    candidates = score_candidates([
-        {"start": t.start_seconds, "end": t.end_seconds, "text": t.text}
-        for t in transcript
-    ], max_clips=max_clips, audio_peaks=audio_peaks)
-    ids = []
-    for choice in candidates:
-        existing = Clip.query.filter_by(
-            source_id=source.id, start_seconds=choice.start, end_seconds=choice.end).first()
-        if existing:
-            ids.append(existing.id)
-        else:
-            clip = Clip(source_id=source.id, start_seconds=choice.start,
-                        end_seconds=choice.end, score=choice.score,
-                        editorial_status="awaiting_worker")
-            db.session.add(clip)
+        if not transcript:
+            result = transcribe_file(source.source_uri, model_size=model_size)
+            language, segments = _validate_transcription(result)
+            for start, end, text in segments:
+                db.session.add(TranscriptSegment(
+                    source_id=source.id, start_seconds=start, end_seconds=end,
+                    text=text, language=language))
             db.session.flush()
-            ids.append(clip.id)
-    db.session.commit()
-    return {"source_id": source_id, "clip_ids": ids,
-            "transcript_segments": len(transcript), "audio_peaks": len(audio_peaks),
-            "candidate_count": len(ids)}
+            transcript = TranscriptSegment.query.filter_by(source_id=source.id).order_by(
+                TranscriptSegment.start_seconds).all()
+        try:
+            audio_peaks = detect_audio_peaks(source.source_uri)
+        except (OSError, RuntimeError, ValueError):
+            audio_peaks = []  # Transcript-only scoring remains available.
+        candidates = score_candidates([
+            {"start": t.start_seconds, "end": t.end_seconds, "text": t.text}
+            for t in transcript
+        ], max_clips=max_clips, audio_peaks=audio_peaks)
+        ids = []
+        for choice in candidates:
+            existing = Clip.query.filter_by(
+                source_id=source.id, start_seconds=choice.start, end_seconds=choice.end).first()
+            if existing:
+                ids.append(existing.id)
+            else:
+                clip = Clip(source_id=source.id, start_seconds=choice.start,
+                            end_seconds=choice.end, score=choice.score,
+                            editorial_status="awaiting_worker")
+                db.session.add(clip)
+                db.session.flush()
+                ids.append(clip.id)
+        db.session.commit()
+        return {"source_id": source_id, "clip_ids": ids,
+                "transcript_segments": len(transcript), "audio_peaks": len(audio_peaks),
+                "candidate_count": len(ids)}
+    except Exception:
+        db.session.rollback()
+        raise

@@ -106,3 +106,13 @@ def auto_plan():
     except (ValueError, TypeError) as exc:
         return jsonify(error=str(exc)), 400
     return jsonify(result), (201 if request.method == "POST" else 200)
+
+
+@review_bp.post("/review/score-missing")
+@admin_only
+def score_missing():
+    """Explicit owner action to rank existing ready clips without rerendering."""
+    if current_app.config.get("READ_ONLY_DEPLOYMENT"):
+        return jsonify(error="Modo solo lectura"), 403
+    from ..services.score_backfill import score_existing_clips
+    return jsonify(score_existing_clips(limit=100))

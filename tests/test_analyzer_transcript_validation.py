@@ -20,6 +20,8 @@ from app.services.analyzer import _validate_transcription, analyze_source
     {"language": "es", "segments": [{"start": 2, "end": 1, "text": "ok"}]},
     {"language": "es", "segments": [{"start": 1, "end": 1, "text": "ok"}]},
     {"language": "es", "segments": [{"start": "0", "end": 1, "text": "ok"}]},
+    {"language": "es", "segments": [{"start": 0, "end": 10 ** 1000, "text": "ok"}]},
+    {"language": "es", "segments": [{"start": 10 ** 1000, "end": 10 ** 1001, "text": "ok"}]},
 ])
 def test_reject_invalid_transcription(payload):
     with pytest.raises(ValueError):

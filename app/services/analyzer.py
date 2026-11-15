@@ -1,5 +1,33 @@
 """Reusable analysis service called by a Celery worker or local CLI."""
 from pathlib import Path
+import math
+
+
+def _validate_transcription(result):
+    """Validate model output before persisting any transcript rows."""
+    if not isinstance(result, dict):
+        raise ValueError("Transcription must be a mapping")
+    language = result.get("language")
+    segments = result.get("segments")
+    if not isinstance(language, str) or not language.strip() or len(language) > 20:
+        raise ValueError("Invalid transcription language")
+    if not isinstance(segments, (list, tuple)):
+        raise ValueError("Transcription segments must be a sequence")
+    cleaned = []
+    for segment in segments:
+        if not isinstance(segment, dict):
+            raise ValueError("Invalid transcription segment")
+        start, end, text = (segment.get(key) for key in ("start", "end", "text"))
+        if (type(start) not in (int, float) or type(end) not in (int, float)
+                or not math.isfinite(start) or not math.isfinite(end)
+                or start < 0 or end <= start):
+            raise ValueError("Invalid transcription timestamps")
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError("Invalid transcription text")
+        cleaned.append((float(start), float(end), text.strip()))
+    return language.strip(), cleaned
+
+
 from ..models import db, MediaSource, Clip, TranscriptSegment
 from .rights import assess_rights
 from .transcription import transcribe_file
@@ -23,10 +51,11 @@ def analyze_source(source_id: int, *, model_size="small", max_clips=5):
         TranscriptSegment.start_seconds).all()
     if not transcript:
         result = transcribe_file(source.source_uri, model_size=model_size)
-        for s in result["segments"]:
+        language, segments = _validate_transcription(result)
+        for start, end, text in segments:
             db.session.add(TranscriptSegment(
-                source_id=source.id, start_seconds=s["start"], end_seconds=s["end"],
-                text=s["text"], language=result["language"]))
+                source_id=source.id, start_seconds=start, end_seconds=end,
+                text=text, language=language))
         db.session.commit()
         transcript = TranscriptSegment.query.filter_by(source_id=source.id).order_by(
             TranscriptSegment.start_seconds).all()

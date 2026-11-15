@@ -4,6 +4,7 @@ from flask import current_app
 from ..models import db, Clip, MediaSource
 from .rights import assess_rights
 from ..pipeline import create_local_clip
+from ..quality import validate_render
 
 
 def process_clip(clip_id: int):
@@ -19,8 +20,17 @@ def process_clip(clip_id: int):
     db.session.commit()
     target = Path(current_app.config["MEDIA_ROOT"]) / "clips" / f"clip-{clip.id}.mp4"
     try:
-        info = create_local_clip(source.source_uri, target, start=clip.start_seconds,
-                                 end=clip.end_seconds, authorized=True)
+        if target.exists():
+            # Recover completed output after a worker crash or failed DB commit.
+            # An invalid existing file must never be overwritten silently.
+            export = validate_render(target)
+            expected = clip.end_seconds - clip.start_seconds
+            if abs(export["duration"] - expected) > 1.5:
+                raise ValueError("Existing clip duration differs from requested segment")
+            info = {"path": str(target.resolve()), "export": export, "recovered": True}
+        else:
+            info = create_local_clip(source.source_uri, target, start=clip.start_seconds,
+                                     end=clip.end_seconds, authorized=True)
         from .subtitle_export import export_clip_srt
         subtitles = Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{clip.id}.srt"
         subtitle_path = export_clip_srt(clip.id, subtitles)

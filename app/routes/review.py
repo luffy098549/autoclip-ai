@@ -2,10 +2,12 @@
 
 Read-only: no downloads, scheduling, or social publishing are triggered.
 """
-from flask import Blueprint, jsonify, request
+from pathlib import Path
+
+from flask import Blueprint, current_app, jsonify, request
 from sqlalchemy.orm import joinedload
 
-from ..models import Clip, MediaSource
+from ..models import db, Clip, MediaSource, Publication
 from ..security import admin_only
 from ..services.rights import assess_rights
 from ..intelligence.daily_selection import select_daily_clips
@@ -53,3 +55,64 @@ def daily_review():
             "download_url": f"/api/clips/{clip.clip_id}/download",
         } for clip in selected],
     )
+
+
+@review_bp.get("/review/youtube-preflight/<int:clip_id>")
+@admin_only
+def youtube_preflight(clip_id):
+    """Read-only checks before an owner-approved private YouTube upload."""
+    clip = db.session.get(Clip, clip_id)
+    if clip is None:
+        return jsonify(error="Clip no encontrado", ready=False), 404
+    source = db.session.get(MediaSource, clip.source_id)
+    rights = (assess_rights(source.rights_status, source.permission_evidence).allowed
+              if source is not None else False)
+    root = (Path(current_app.config["MEDIA_ROOT"]) / "clips").resolve()
+    video = Path(clip.output_path).resolve() if clip.output_path else None
+    upload_record = (Publication.query.filter_by(clip_id=clip_id, platform="youtube")
+                     .filter(Publication.state.in_(("publishing", "published", "upload_uncertain")))
+                     .order_by(Publication.id.desc()).first())
+    checks = {
+        "no_existing_upload_attempt": upload_record is None,
+        "editorial_ready": clip.editorial_status == "ready",
+        "rights_evidence_present": rights,
+        "mp4_in_private_clips_directory": bool(video and video.parent == root and video.is_file() and video.suffix.lower() == ".mp4"),
+        "youtube_oauth_token_present": (Path(current_app.config["MEDIA_ROOT"]) / "private" / "youtube-token.json").is_file(),
+        "publishing_disabled": not current_app.config.get("PUBLISHING_ENABLED", False),
+    }
+    return jsonify(clip_id=clip_id, ready=all(checks.values()), checks=checks,
+                   privacy="private", uploaded=bool(upload_record and upload_record.state == "published"),
+                   upload_state=upload_record.state if upload_record else None,
+                   note="Solo comprobación local. No envía datos ni videos a YouTube.")
+
+
+@review_bp.route("/review/auto-plan", methods=["GET", "POST"])
+@admin_only
+def auto_plan():
+    """Preview or create up to five local plans per platform; never uploads."""
+    from datetime import date
+    from ..services.auto_planner import build_daily_plan
+    data = request.get_json(silent=True) or {} if request.method == "POST" else request.args
+    try:
+        day = date.fromisoformat(str(data.get("date"))) if data.get("date") else None
+        limit = int(data.get("limit", 5))
+        platforms = data.get("platforms", ["youtube"])
+        if isinstance(platforms, str):
+            platforms = [p.strip() for p in platforms.split(",") if p.strip()]
+        if not isinstance(platforms, list):
+            raise ValueError("platforms must be a list")
+        result = build_daily_plan(date=day, limit=limit, platforms=tuple(platforms),
+                                  dry_run=request.method == "GET")
+    except (ValueError, TypeError) as exc:
+        return jsonify(error=str(exc)), 400
+    return jsonify(result), (201 if request.method == "POST" else 200)
+
+
+@review_bp.post("/review/score-missing")
+@admin_only
+def score_missing():
+    """Explicit owner action to rank existing ready clips without rerendering."""
+    if current_app.config.get("READ_ONLY_DEPLOYMENT"):
+        return jsonify(error="Modo solo lectura"), 403
+    from ..services.score_backfill import score_existing_clips
+    return jsonify(score_existing_clips(limit=100))

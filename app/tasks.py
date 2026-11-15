@@ -74,3 +74,43 @@ def youtube_metadata_task(streamer_id: int):
     app = create_app()
     with app.app_context():
         return sync_youtube_channel(streamer_id, key)
+
+
+@celery_app.task(name="autoclip.daily_auto_plan_task")
+def daily_auto_plan_task():
+    """Idempotent local scheduling; publishing remains a separate, disabled step."""
+    from . import create_app
+    from .services.auto_planner import build_daily_plan
+    app = create_app()
+    with app.app_context():
+        if not app.config.get("AUTO_PLANNING_ENABLED") or app.config.get("READ_ONLY_DEPLOYMENT"):
+            return {"skipped": True, "reason": "AUTO_PLANNING_ENABLED is off"}
+        from .services.score_backfill import score_existing_clips
+        scores = score_existing_clips(limit=100)
+        plan = build_daily_plan(platforms=("youtube", "tiktok", "instagram"), dry_run=False)
+        plan["score_backfill"] = scores
+        return plan
+
+
+@celery_app.task(name="autoclip.dispatch_due_task")
+def dispatch_due_task():
+    from . import create_app
+    from .services.auto_dispatch import dispatch_due
+    app = create_app()
+    with app.app_context():
+        return dispatch_due()
+
+
+# Celery Beat evaluates the planner once a day in New York time.
+# It creates local plans only and never uploads to social networks.
+from celery.schedules import crontab
+celery_app.conf.beat_schedule = {
+    "daily-clip-planning": {
+        "task": "autoclip.daily_auto_plan_task",
+        "schedule": crontab(hour=9, minute=0),
+    },
+    "dispatch-due-private-youtube": {
+        "task": "autoclip.dispatch_due_task",
+        "schedule": 300.0,
+    },
+}

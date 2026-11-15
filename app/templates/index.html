@@ -19,7 +19,7 @@
     <ol class="steps"><li><b>Fuentes autorizadas</b><small>Verificación de derechos antes de procesar</small></li><li><b>Selección inteligente</b><small>Whisper y puntuación heurística: activación opcional</small></li><li><b>Edición vertical</b><small>FFmpeg y control de calidad: base disponible</small></li><li><b>Planificación</b><small>Borradores privados: 120 minutos y cinco por red</small></li><li><b>Distribución</b><small>APIs oficiales: pendientes de integrar</small></li></ol>
   </section>
   <section class="panel"><div class="section-heading"><h3>Destinos</h3><span class="tag">3 redes</span></div>
-    <div class="network"><span class="network-logo">▶</span><div><b>YouTube Shorts</b><small>Máximo 5 publicaciones al día</small></div><span class="tag muted">Sin conectar</span></div>
+    <div class="network"><span class="network-logo">▶</span><div><b>YouTube Shorts</b><small>Máximo 5 publicaciones al día</small></div>{% if youtube_token_present %}<span class="tag">Autorizado</span>{% else %}<span class="tag muted">Sin conectar</span>{% endif %}</div>
     <div class="network"><span class="network-logo">♪</span><div><b>TikTok</b><small>Máximo 5 publicaciones al día</small></div><span class="tag muted">Sin conectar</span></div>
     <div class="network"><span class="network-logo">◎</span><div><b>Instagram Reels</b><small>Máximo 5 publicaciones al día</small></div><span class="tag muted">Sin conectar</span></div>
     {% if session.get("admin_authenticated") %}<p class="smallprint" id="summary-message">Consultando estado de la base de datos…</p>{% endif %}

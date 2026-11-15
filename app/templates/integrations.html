@@ -14,7 +14,8 @@
   <article class="panel integration-card">
     <div class="section-heading"><h3>YouTube Shorts</h3><span class="tag">OAuth 2.0</span></div>
     <p>La autorización de tu canal se realiza en Google, con el permiso limitado <code>youtube.upload</code>. El primer envío de prueba debe ser privado.</p>
-    <p class="smallprint">Paso de configuración local: <code>python -m scripts.youtube_oauth</code></p>
+    {% if session.get("admin_authenticated") %}<p><a class="button" href="{{ url_for('integrations.youtube_connect') }}">Conectar o renovar YouTube</a></p>{% endif %}
+    <p class="smallprint">La conexión no activa publicaciones. El estado local del token se consulta de forma privada; su vigencia puede requerir renovación.</p>
     <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" rel="noopener noreferrer" target="_blank">YouTube Data API</a>
   </article>
   <article class="panel integration-card">

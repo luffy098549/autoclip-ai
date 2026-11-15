@@ -1,5 +1,6 @@
 """Read-only initial dashboard. State-changing actions will require authentication."""
-from flask import Blueprint, render_template
+from pathlib import Path
+from flask import Blueprint, current_app, render_template, session
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
@@ -14,7 +15,11 @@ PAGES = {
 
 
 def render_page(template, title):
-    return render_template(template, title=title)
+    youtube_token_present = False
+    if session.get("admin_authenticated"):
+        token = Path(current_app.config["MEDIA_ROOT"]) / "private" / "youtube-token.json"
+        youtube_token_present = token.is_file() and token.stat().st_size > 0
+    return render_template(template, title=title, youtube_token_present=youtube_token_present)
 
 
 @dashboard_bp.get("/")

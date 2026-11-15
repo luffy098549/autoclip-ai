@@ -35,6 +35,11 @@ def create_app(config=None):
         AUTO_RENDER_ENABLED=os.getenv("AUTO_RENDER_ENABLED", "false").lower() == "true",
         AUTO_PLANNING_ENABLED=os.getenv("AUTO_PLANNING_ENABLED", "false").lower() == "true",
         AUTO_PUBLISH_YOUTUBE_PRIVATE=os.getenv("AUTO_PUBLISH_YOUTUBE_PRIVATE", "false").lower() == "true",
+        YOUTUBE_SCHEDULED_MADE_FOR_KIDS=(
+            {"true": True, "false": False}.get(
+                os.getenv("YOUTUBE_SCHEDULED_MADE_FOR_KIDS", "").strip().lower()
+            )
+        ),
         AUTO_CAPTION_ENABLED=os.getenv("AUTO_CAPTION_ENABLED", "false").lower() == "true",
         MONITORING_ENABLED=os.getenv("MONITORING_ENABLED", "false").lower() == "true",
         READ_ONLY_DEPLOYMENT=os.getenv("READ_ONLY_DEPLOYMENT", "false").lower() == "true",

@@ -118,3 +118,22 @@ def test_upload_rejects_unverified_rights_and_read_only_mode(upload_env, monkeyp
         assert Publication.query.count() == 0
     app.config["READ_ONLY_DEPLOYMENT"] = True
     assert client.post("/api/integrations/youtube/upload-private", json=payload()).status_code == 403
+
+
+def test_preflight_reflects_persisted_private_upload(upload_env, monkeypatch):
+    app, client = upload_env
+    authenticate(client)
+    initial = client.get("/api/review/youtube-preflight/1")
+    assert initial.status_code == 200
+    assert initial.json["uploaded"] is False
+    assert initial.json["checks"]["no_existing_upload_attempt"] is True
+    monkeypatch.setattr("app.publishers.youtube.upload_short",
+                        lambda *args, **kwargs: "mock-private-video")
+    assert client.post("/api/integrations/youtube/upload-private",
+                       json=payload()).status_code == 201
+    result = client.get("/api/review/youtube-preflight/1")
+    assert result.status_code == 200
+    assert result.json["uploaded"] is True
+    assert result.json["upload_state"] == "published"
+    assert result.json["ready"] is False
+    assert result.json["checks"]["no_existing_upload_attempt"] is False

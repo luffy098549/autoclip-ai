@@ -48,10 +48,13 @@ def youtube_connect():
         flow = _youtube_flow()
     except (ImportError, ValueError) as exc:
         return jsonify(error=str(exc)), 503
+    # Persist PKCE verifier across the Google redirect and callback.
+    flow.code_verifier = secrets.token_urlsafe(64)
     authorization_url, state = flow.authorization_url(
         access_type="offline", prompt="consent", include_granted_scopes="false"
     )
     session["youtube_oauth_state"] = state
+    session["youtube_oauth_code_verifier"] = flow.code_verifier
     return redirect(authorization_url)
 
 
@@ -61,13 +64,15 @@ def youtube_callback():
     if current_app.config.get("READ_ONLY_DEPLOYMENT"):
         return jsonify(error="Modo de solo lectura"), 403
     expected = session.pop("youtube_oauth_state", None)
+    verifier = session.pop("youtube_oauth_code_verifier", None)
     received = request.args.get("state", "")
-    if not expected or not secrets.compare_digest(expected, received):
+    if not expected or not verifier or not secrets.compare_digest(expected, received):
         return jsonify(error="Estado OAuth inválido o caducado"), 400
     if request.args.get("error"):
         return jsonify(error="Google no autorizó la conexión"), 400
     try:
         flow = _youtube_flow()
+        flow.code_verifier = verifier
         # The external HTTPS redirect URI comes exclusively from trusted
         # configuration. Codespaces may replace Host and scheme internally,
         # so never compare the proxy-facing Host to the public redirect host.

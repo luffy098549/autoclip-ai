@@ -37,6 +37,7 @@ def build_daily_plan(*, date=None, platforms=("youtube",), dry_run=True, limit=5
     selected = select_daily_clips(eligible, target=min(20, max(limit * 4, 5)))
     existing = Publication.query.filter(Publication.platform.in_(platforms)).all()
     reserved = {(p.clip_id, p.platform) for p in existing if p.state in ACTIVE}
+    # Never plan a clip already sent to this platform, even in a prior day.
     # Five windows spaced by 2h, beginning at 10:00 New York time.
     windows = [datetime.combine(date, time(10 + 2 * i), tzinfo=TIMEZONE)
                for i in range(limit)]

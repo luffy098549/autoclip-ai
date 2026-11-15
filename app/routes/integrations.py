@@ -106,6 +106,17 @@ def youtube_callback():
 def integration_readiness():
     storage = Path(current_app.config["MEDIA_ROOT"])
     token_file = storage / "private" / "youtube-token.json"
+    # Read-only local OAuth status; never expose token contents.
+    token_status = "not_connected"
+    if token_file.is_file() and token_file.stat().st_size > 0:
+        try:
+            from google.oauth2.credentials import Credentials
+            credentials = Credentials.from_authorized_user_file(str(token_file))
+            token_status = "authorized" if credentials.valid else (
+                "refresh_required" if credentials.refresh_token else "reauthorization_required"
+            )
+        except (ValueError, OSError, KeyError):
+            token_status = "reauthorization_required"
     return jsonify(
         deployment={
             "read_only_demo": bool(current_app.config.get("READ_ONLY_DEPLOYMENT")),
@@ -113,6 +124,7 @@ def integration_readiness():
         },
         youtube={
             "local_oauth_token_present": token_file.is_file(),
+            "local_oauth_status": token_status,
             "metadata_api_key_present": bool(os.getenv("YOUTUBE_API_KEY")),
             "manual_uploader_available": True,
             "automatic_publishing_enabled": False,

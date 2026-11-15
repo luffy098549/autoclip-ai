@@ -10,16 +10,42 @@ CUES = {
 }
 
 
+def _finite_number(value):
+    """Accept only finite real numeric values, excluding booleans and huge integers."""
+    if type(value) not in (int, float):
+        return False
+    try:
+        return math.isfinite(value)
+    except (OverflowError, ValueError, TypeError):
+        return False
+
+
+def _valid_audio_peaks(peaks):
+    """Discard malformed optional peaks rather than aborting transcript analysis."""
+    if not isinstance(peaks, (list, tuple)):
+        return []
+    valid = []
+    for peak in peaks:
+        if not isinstance(peak, (list, tuple)) or len(peak) != 2:
+            continue
+        timestamp, strength = peak
+        if _finite_number(timestamp) and _finite_number(strength):
+            valid.append((timestamp, strength))
+    return valid
+
+
 def score_candidates(transcript_segments: list[dict], *,
                      minimum_seconds: float = 18,
                      maximum_seconds: float = 65,
                      max_clips: int = 5,
                      audio_peaks: list[tuple[float, float]] | None = None) -> list[Candidate]:
     """Return nonoverlapping candidate windows from timed text; scoring is experimental."""
-    if (not all(math.isfinite(x) for x in (minimum_seconds, maximum_seconds))
+    if (any(type(x) not in (int, float) for x in (minimum_seconds, maximum_seconds))
+            or not all(_finite_number(x) for x in (minimum_seconds, maximum_seconds))
             or minimum_seconds <= 0 or maximum_seconds < minimum_seconds
-            or not 1 <= max_clips <= 5):
+            or type(max_clips) is not int or not 1 <= max_clips <= 5):
         raise ValueError("Invalid duration constraints")
+    audio_peaks = _valid_audio_peaks(audio_peaks)
     segments = []
     for segment in transcript_segments:
         try:
@@ -60,8 +86,7 @@ def score_candidates(transcript_segments: list[dict], *,
                 audio_bonus = min(12.0, sum(
                     min(1.0, max(0.0, strength)) * 4.0
                     for timestamp, strength in audio_peaks
-                    if math.isfinite(timestamp) and math.isfinite(strength)
-                    and start <= timestamp < end
+                    if start <= timestamp < end
                 ))
             score = min(100.0, 48 + min(cues, 4) * 6 + expressions * 3
                         + min(1.8, density) * 5 + diversity * 11 + audio_bonus)

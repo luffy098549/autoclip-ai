@@ -23,3 +23,37 @@ def test_unfinalized_legal_text_is_not_indexed_or_cached():
             assert response.headers["X-Robots-Tag"] == "noindex, nofollow, noarchive"
             assert response.headers["Cache-Control"] == "no-store"
             assert response.headers["Content-Security-Policy"]
+
+
+def test_verification_disabled_without_operator_configuration(monkeypatch):
+    monkeypatch.delenv("TIKTOK_VERIFICATION_FILENAME", raising=False)
+    monkeypatch.delenv("TIKTOK_VERIFICATION_CONTENT", raising=False)
+    app = create_app({"TESTING": True, "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:"})
+    with app.test_client() as client:
+        assert client.get("/tiktok-verification.txt").status_code == 404
+
+
+def test_verification_exact_match_only(monkeypatch):
+    monkeypatch.setenv("TIKTOK_VERIFICATION_FILENAME", "tiktok-check-123.txt")
+    monkeypatch.setenv("TIKTOK_VERIFICATION_CONTENT", "tiktok-verification-123")
+    app = create_app({"TESTING": True, "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:"})
+    with app.test_client() as client:
+        response = client.get("/tiktok-check-123.txt")
+        assert response.status_code == 200
+        assert response.mimetype == "text/plain"
+        assert response.data == b"tiktok-verification-123\\n"
+        assert response.headers["Cache-Control"] == "no-store"
+        assert client.get("/tiktok-check-123.txt.bak").status_code == 404
+        assert client.get("/different.txt").status_code == 404
+
+
+def test_verification_rejects_invalid_configuration(monkeypatch):
+    monkeypatch.setenv("TIKTOK_VERIFICATION_FILENAME", "../secret.txt")
+    monkeypatch.setenv("TIKTOK_VERIFICATION_CONTENT", "tiktok-verification-123")
+    app = create_app({"TESTING": True, "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:"})
+    with app.test_client() as client:
+        assert client.get("/secret.txt").status_code == 404
+    monkeypatch.setenv("TIKTOK_VERIFICATION_FILENAME", "tiktok-check.txt")
+    monkeypatch.setenv("TIKTOK_VERIFICATION_CONTENT", "line1\\nline2")
+    with app.test_client() as client:
+        assert client.get("/tiktok-check.txt").status_code == 404

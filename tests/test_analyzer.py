@@ -27,3 +27,18 @@ def test_analysis_stores_transcript_and_shortlists(tmp_path, monkeypatch):
         second = analyze_source(sid)
         assert first["clip_ids"] == second["clip_ids"]
         assert TranscriptSegment.query.filter_by(source_id=sid).count() == 10
+
+
+import pytest
+
+
+@pytest.mark.parametrize("source_id", [None, True, False, 0, -1, 1.0, "1", [], {}])
+def test_analyzer_rejects_invalid_source_id_before_db(source_id):
+    with pytest.raises(ValueError, match="source_id"):
+        analyze_source(source_id)
+
+
+@pytest.mark.parametrize("max_clips", [None, True, False, 0, -1, 6, 1.0, 5.0, "5", [], {}])
+def test_analyzer_rejects_invalid_max_clips_before_db(max_clips):
+    with pytest.raises(ValueError, match="max_clips"):
+        analyze_source(1, max_clips=max_clips)

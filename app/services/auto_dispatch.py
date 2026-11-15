@@ -15,6 +15,9 @@ def dispatch_due(*, now=None, max_items=5):
     from flask import current_app
     if not current_app.config.get("AUTO_PUBLISH_YOUTUBE_PRIVATE", False):
         return {"skipped": True, "reason": "AUTO_PUBLISH_YOUTUBE_PRIVATE disabled"}
+    audience = current_app.config.get("YOUTUBE_SCHEDULED_MADE_FOR_KIDS")
+    if type(audience) is not bool:
+        return {"skipped": True, "reason": "YouTube audience classification required"}
     if current_app.config.get("READ_ONLY_DEPLOYMENT"):
         return {"skipped": True, "reason": "read-only deployment"}
     now = now or datetime.now(timezone.utc)
@@ -85,7 +88,7 @@ def dispatch_due(*, now=None, max_items=5):
             video_id = upload_short(
                 str(video), title=f"AutoClip AI - Clip {clip.id}",
                 description="Clip procesado con AutoClip AI.",
-                token_path=str(token), privacy_status="private", made_for_kids=False)
+                token_path=str(token), privacy_status="private", made_for_kids=audience)
         except Exception:
             current_app.logger.exception("Scheduled YouTube upload result unknown")
             item.state = "upload_uncertain"

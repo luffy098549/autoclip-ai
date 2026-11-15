@@ -58,6 +58,9 @@ def analyze_source(source_id: int, *, model_size="small", max_clips=5):
         raise ValueError("source_id must be a positive integer")
     if type(max_clips) is not int or not 1 <= max_clips <= 5:
         raise ValueError("max_clips must be an integer between 1 and 5")
+    if (not isinstance(model_size, str) or not model_size.strip()
+            or len(model_size) > 128 or any(ord(char) < 32 for char in model_size)):
+        raise ValueError("Invalid transcription model size")
     source = db.session.get(MediaSource, source_id)
     if not source:
         raise ValueError("Source does not exist")

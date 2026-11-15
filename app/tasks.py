@@ -92,6 +92,15 @@ def daily_auto_plan_task():
         return plan
 
 
+@celery_app.task(name="autoclip.dispatch_due_task")
+def dispatch_due_task():
+    from . import create_app
+    from .services.auto_dispatch import dispatch_due
+    app = create_app()
+    with app.app_context():
+        return dispatch_due()
+
+
 # Celery Beat evaluates the planner once a day in New York time.
 # It creates local plans only and never uploads to social networks.
 from celery.schedules import crontab
@@ -99,5 +108,9 @@ celery_app.conf.beat_schedule = {
     "daily-clip-planning": {
         "task": "autoclip.daily_auto_plan_task",
         "schedule": crontab(hour=9, minute=0),
+    },
+    "dispatch-due-private-youtube": {
+        "task": "autoclip.dispatch_due_task",
+        "schedule": 300.0,
     },
 }

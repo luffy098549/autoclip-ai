@@ -67,7 +67,7 @@ def dispatch_due(*, now=None, max_items=5):
             item.state = "planned"
             db.session.commit()
             results.append({"publication_id": item.id, "state": "waiting_for_youtube"})
-            continue
+            break
         # Do not send a clip twice even if it has another planned row.
         duplicate = (Publication.query.filter(Publication.clip_id == clip.id,
                                               Publication.platform == "youtube",

@@ -22,17 +22,17 @@ Automatización de edición de videos cortos **con material propio o autorizado*
 - Reproductor privado de clips 9:16, con filtros por estado y descargas MP4/SRT
 - Calendario privado de borradores con cancelación, límites de 120 minutos y máximo 5 por red/día; sin uploads reales
 - Registro manual de métricas de clips de tus propias cuentas, gráficos por red y ranking descriptivo por visualizaciones (sin ingresos estimados)
-- Integraciones oficiales condicionadas a OAuth: YouTube mediante CLI manual; Instagram Reels en dos fases; TikTok con borrador en la bandeja de entrada
+- OAuth web para YouTube y formulario de subida privada por clip con confirmación manual, historial y bloqueo de duplicados (pendiente validar con servicios reales desde el Dashboard); Instagram Reels en dos fases; TikTok con borrador en la bandeja de entrada
 - Pruebas de SDK sociales simuladas, PostgreSQL y frontend en GitHub Actions
 
 ## NO implementado todavía
 
 - Descarga de directos de terceros, monitoreo en vivo de Kick o YouTube
-- Permisos de acceso/OAuth a cuentas de YouTube, TikTok o Instagram
+- Conexión OAuth y revisión de permisos de TikTok e Instagram; YouTube OAuth web ya está implementado, pero requiere configuración por propietario
 - Publicación autónoma de videos o monetización; integraciones manuales requieren OAuth, permisos de apps y revisión de cada cuenta
 - Reencuadre inteligente de rostros y narración original automática
 - Análisis de rendimiento con métricas de cuentas conectadas
-- Publicación real en plataformas, auditoría de tareas avanzada y seguridad de despliegue público
+- Publicación automática en plataformas, auditoría de tareas avanzada y seguridad de despliegue público
 
 **Ningún video se publica automáticamente en redes en esta versión.**
 
@@ -69,3 +69,12 @@ Los borradores del calendario no provocan publicaciones en redes. El proyecto bu
 ## Seguridad
 
 El repositorio es público: nunca subas `.env`, contraseñas, OAuth tokens, videos privados ni claves. Docker expone el panel solo en `127.0.0.1` para desarrollo. Antes de desplegar públicamente se necesitan HTTPS, gestión de secretos, límites de intentos, autenticación reforzada y migraciones de base de datos.
+
+## YouTube: fase 3 (subida privada manual)
+
+1. Configura OAuth web y conecta tu cuenta desde **Integraciones**; conserva los tokens solo en `storage/private/`.
+2. Importa material propio/autorizado, genera un clip y comprueba su vista previa en **Biblioteca de clips**.
+3. En **Subir clip a YouTube**, elige el clip, título, descripción y audiencia. Confirma la subida privada explícitamente.
+4. Consulta **Historial de subidas a YouTube**. Ante errores de red, revisa YouTube Studio antes de reintentar: el sistema marca el resultado como incierto para prevenir duplicados.
+
+**Importante:** los videos subidos previamente por terminal no se registran retroactivamente en el historial; no vuelvas a subirlos desde el panel. Los borradores de calendario siguen sin publicar automáticamente. La nueva ruta se prueba con mocks; falta verificar la interacción real en Codespaces y en la cuenta de YouTube.

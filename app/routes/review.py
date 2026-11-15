@@ -7,7 +7,7 @@ from pathlib import Path
 from flask import Blueprint, current_app, jsonify, request
 from sqlalchemy.orm import joinedload
 
-from ..models import db, Clip, MediaSource
+from ..models import db, Clip, MediaSource, Publication
 from ..security import admin_only
 from ..services.rights import assess_rights
 from ..intelligence.daily_selection import select_daily_clips
@@ -69,7 +69,11 @@ def youtube_preflight(clip_id):
               if source is not None else False)
     root = (Path(current_app.config["MEDIA_ROOT"]) / "clips").resolve()
     video = Path(clip.output_path).resolve() if clip.output_path else None
+    upload_record = (Publication.query.filter_by(clip_id=clip_id, platform="youtube")
+                     .filter(Publication.state.in_(("publishing", "published", "upload_uncertain")))
+                     .order_by(Publication.id.desc()).first())
     checks = {
+        "no_existing_upload_attempt": upload_record is None,
         "editorial_ready": clip.editorial_status == "ready",
         "rights_evidence_present": rights,
         "mp4_in_private_clips_directory": bool(video and video.parent == root and video.is_file() and video.suffix.lower() == ".mp4"),
@@ -77,5 +81,6 @@ def youtube_preflight(clip_id):
         "publishing_disabled": not current_app.config.get("PUBLISHING_ENABLED", False),
     }
     return jsonify(clip_id=clip_id, ready=all(checks.values()), checks=checks,
-                   privacy="private", uploaded=False,
+                   privacy="private", uploaded=bool(upload_record and upload_record.state == "published"),
+                   upload_state=upload_record.state if upload_record else None,
                    note="Solo comprobación local. No envía datos ni videos a YouTube.")

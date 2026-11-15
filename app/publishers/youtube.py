@@ -4,7 +4,10 @@ from pathlib import Path
 
 from .base import PublishingDisabled
 
-SCOPES = ("https://www.googleapis.com/auth/youtube.upload",)
+SCOPES = (
+    "https://www.googleapis.com/auth/youtube.upload",
+    "https://www.googleapis.com/auth/youtube.readonly",
+)
 VALID_PRIVACY = {"private", "unlisted", "public"}
 
 

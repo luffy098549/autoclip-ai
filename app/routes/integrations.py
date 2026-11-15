@@ -142,3 +142,109 @@ def integration_readiness():
         },
         note="Presence flags only: account authorization and API availability are not verified.",
     )
+
+
+@integrations_bp.get("/integrations/youtube/uploads")
+@admin_only
+def youtube_upload_history():
+    """Local audit history. Never expose credentials."""
+    from ..models import Publication
+    records = (Publication.query.filter_by(platform="youtube")
+               .filter(Publication.state.in_(("publishing", "published", "upload_uncertain")))
+               .order_by(Publication.id.desc()).limit(100).all())
+    return jsonify(items=[{
+        "clip_id": item.clip_id, "state": item.state,
+        "video_id": item.external_id,
+        "url": ("https://www.youtube.com/watch?v=" + item.external_id) if item.external_id else None,
+    } for item in records])
+
+
+@integrations_bp.post("/integrations/youtube/upload-private")
+@admin_only
+def youtube_upload_private():
+    """Single owner-confirmed private upload, never scheduled or retried automatically."""
+    from datetime import datetime, timezone
+    from uuid import uuid4
+    from sqlalchemy import text
+    from ..models import Clip, MediaSource, Publication
+    from ..services.rights import assess_rights
+    from ..quality import validate_render
+    from ..publishers.youtube import upload_short
+
+    if current_app.config.get("READ_ONLY_DEPLOYMENT"):
+        return jsonify(error="Modo solo lectura"), 403
+    data = request.get_json(silent=True) or {}
+    if data.get("confirm_private") is not True:
+        return jsonify(error="Confirma expresamente la subida privada"), 400
+    try:
+        clip_id = int(data.get("clip_id"))
+    except (ValueError, TypeError):
+        return jsonify(error="Clip inválido"), 400
+    title = data.get("title")
+    description = data.get("description", "")
+    if not isinstance(title, str) or not 1 <= len(title.strip()) <= 100:
+        return jsonify(error="Título de 1 a 100 caracteres requerido"), 400
+    if not isinstance(description, str) or len(description) > 5000:
+        return jsonify(error="Descripción demasiado larga"), 400
+    if not isinstance(data.get("made_for_kids"), bool):
+        return jsonify(error="Indica si el video está dirigido a niños"), 400
+
+    # Serialize concurrent requests, then reserve the clip before touching YouTube.
+    if db.engine.dialect.name == "postgresql":
+        db.session.execute(text("SELECT pg_advisory_xact_lock(:key)"),
+                           {"key": 500000000 + clip_id})
+    existing = (Publication.query.filter_by(clip_id=clip_id, platform="youtube")
+                .filter(Publication.state.in_(("publishing", "published", "upload_uncertain")))
+                .first())
+    if existing:
+        db.session.rollback()
+        return jsonify(error="Ya existe una subida o intento pendiente de verificar para este clip",
+                       state=existing.state, video_id=existing.external_id), 409
+    clip = db.session.get(Clip, clip_id)
+    if not clip or clip.editorial_status != "ready" or not clip.output_path:
+        db.session.rollback()
+        return jsonify(error="El clip no está listo"), 400
+    source = db.session.get(MediaSource, clip.source_id)
+    if not source or not assess_rights(source.rights_status, source.permission_evidence).allowed:
+        db.session.rollback()
+        return jsonify(error="Fuente sin autorización registrada"), 403
+    root = (Path(current_app.config["MEDIA_ROOT"]) / "clips").resolve()
+    video = Path(clip.output_path).resolve()
+    if video.parent != root or not video.is_file() or video.suffix.lower() != ".mp4":
+        db.session.rollback()
+        return jsonify(error="MP4 no disponible"), 400
+    try:
+        validate_render(video)
+    except Exception:
+        db.session.rollback()
+        return jsonify(error="El video no superó la validación de calidad"), 400
+    token = Path(current_app.config["MEDIA_ROOT"]) / "private" / "youtube-token.json"
+    if not token.is_file():
+        db.session.rollback()
+        return jsonify(error="Conecta YouTube primero"), 503
+
+    record = Publication(
+        clip_id=clip_id, platform="youtube", scheduled_at=datetime.now(timezone.utc),
+        state="publishing", idempotency_key=uuid4().hex
+    )
+    db.session.add(record)
+    db.session.commit()
+    try:
+        video_id = upload_short(str(video), title.strip(), description,
+                                token_path=str(token), privacy_status="private",
+                                made_for_kids=data["made_for_kids"])
+    except Exception:
+        # A network failure may happen after YouTube accepted the upload.
+        # Block further attempts until the owner checks YouTube Studio.
+        current_app.logger.exception("YouTube private upload failed or outcome unknown")
+        record.state = "upload_uncertain"
+        db.session.commit()
+        return jsonify(error="No se pudo confirmar la subida. Revisa YouTube Studio antes de reintentar.",
+                       state="upload_uncertain"), 502
+    record.external_id = video_id
+    record.published_at = datetime.now(timezone.utc)
+    record.state = "published"
+    db.session.commit()
+    return jsonify(clip_id=clip_id, video_id=video_id,
+                   url="https://www.youtube.com/watch?v=" + video_id,
+                   privacy_requested="private", state="published"), 201

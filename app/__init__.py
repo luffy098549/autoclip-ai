@@ -39,6 +39,12 @@ def create_app(config=None):
     )
     if config:
         app.config.update(config)
+    # Public deployments must never silently rotate session signing keys or use HTTP cookies.
+    if os.getenv("PUBLIC_DEPLOYMENT", "false").lower() == "true":
+        if not os.getenv("SECRET_KEY") or len(os.environ["SECRET_KEY"]) < 32:
+            raise RuntimeError("PUBLIC_DEPLOYMENT requires a stable SECRET_KEY of at least 32 characters")
+        if not app.config["SESSION_COOKIE_SECURE"]:
+            raise RuntimeError("PUBLIC_DEPLOYMENT requires SESSION_COOKIE_SECURE=true")
     if (app.config.get("ADMIN_PASSWORD_HASH") and
             app.config["SECRET_KEY"] == "replace-with-unique-random-secret"):
         raise RuntimeError("Set a strong SECRET_KEY before enabling admin login")

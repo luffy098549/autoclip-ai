@@ -2,10 +2,12 @@
 
 Read-only: no downloads, scheduling, or social publishing are triggered.
 """
-from flask import Blueprint, jsonify, request
+from pathlib import Path
+
+from flask import Blueprint, current_app, jsonify, request
 from sqlalchemy.orm import joinedload
 
-from ..models import Clip, MediaSource
+from ..models import db, Clip, MediaSource
 from ..security import admin_only
 from ..services.rights import assess_rights
 from ..intelligence.daily_selection import select_daily_clips
@@ -53,3 +55,27 @@ def daily_review():
             "download_url": f"/api/clips/{clip.clip_id}/download",
         } for clip in selected],
     )
+
+
+@review_bp.get("/review/youtube-preflight/<int:clip_id>")
+@admin_only
+def youtube_preflight(clip_id):
+    """Read-only checks before an owner-approved private YouTube upload."""
+    clip = db.session.get(Clip, clip_id)
+    if clip is None:
+        return jsonify(error="Clip no encontrado", ready=False), 404
+    source = db.session.get(MediaSource, clip.source_id)
+    rights = (assess_rights(source.rights_status, source.permission_evidence).allowed
+              if source is not None else False)
+    root = (Path(current_app.config["MEDIA_ROOT"]) / "clips").resolve()
+    video = Path(clip.output_path).resolve() if clip.output_path else None
+    checks = {
+        "editorial_ready": clip.editorial_status == "ready",
+        "rights_evidence_present": rights,
+        "mp4_in_private_clips_directory": bool(video and video.parent == root and video.is_file() and video.suffix.lower() == ".mp4"),
+        "youtube_oauth_token_present": (Path(current_app.config["MEDIA_ROOT"]) / "private" / "youtube-token.json").is_file(),
+        "publishing_disabled": not current_app.config.get("PUBLISHING_ENABLED", False),
+    }
+    return jsonify(clip_id=clip_id, ready=all(checks.values()), checks=checks,
+                   privacy="private", uploaded=False,
+                   note="Solo comprobación local. No envía datos ni videos a YouTube.")

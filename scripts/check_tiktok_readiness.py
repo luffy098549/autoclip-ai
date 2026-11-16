@@ -7,7 +7,8 @@ import ipaddress
 import os
 import sys
 from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
+from urllib.error import HTTPError
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 PATHS = ("/about", "/terms", "/privacy")
 DRAFT_MARKERS = (b"LEGAL DRAFT", b"NOT FINAL", b"Draft for review")
@@ -48,6 +49,8 @@ def assess(origin, fetch):
             continue
         if status != 200:
             issues.append(path[1:] + "_http_error")
+        elif len(content) > 256_000:
+            issues.append(path[1:] + "_oversized_response")
         elif b"<html" not in content.lower() or "text/html" not in content_type.lower():
             issues.append(path[1:] + "_invalid_html")
         elif path != "/about" and any(marker in content for marker in DRAFT_MARKERS):
@@ -55,10 +58,21 @@ def assess(origin, fetch):
     return issues
 
 
+class NoRedirects(HTTPRedirectHandler):
+    """Never follow a redirect from the expected public HTTPS origin."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def fetch_page(url):
     request = Request(url, headers={"User-Agent": "AutoClip-readiness/1.0"})
-    with urlopen(request, timeout=8) as response:
-        return response.status, response.read(256_000), response.headers.get("Content-Type", "")
+    opener = build_opener(NoRedirects())
+    try:
+        with opener.open(request, timeout=8) as response:
+            return response.status, response.read(256_001), response.headers.get("Content-Type", "")
+    except HTTPError as exc:
+        return exc.code, b"", exc.headers.get("Content-Type", "")
 
 
 def main():

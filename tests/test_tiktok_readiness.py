@@ -198,3 +198,20 @@ def test_readiness_accepts_real_html_root_after_comment():
     def fetch(url):
         return 200, b"<!-- <html>example</html> --><html><body>Real policy</body></html>", "text/html"
     assert assess("https://autoclip.example.com", fetch) == []
+
+
+def test_readiness_fails_closed_on_malformed_fetch_results():
+    malformed = (
+        (),
+        (200,),
+        (200, "<html>wrong type</html>", "text/html"),
+        (200, b"<html>ok</html>", None),
+        (200, b"<html>ok</html>", "text/html", None),
+        (True, b"<html>ok</html>", "text/html"),
+    )
+    for result in malformed:
+        def fetch(url):
+            return result
+        assert assess("https://autoclip.example.com", fetch) == [
+            "about_unreachable", "terms_unreachable", "privacy_unreachable"
+        ]

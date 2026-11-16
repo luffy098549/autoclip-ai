@@ -91,10 +91,32 @@ def has_noindex(content, robots_header=""):
     return parser.noindex
 
 
+class VisibleTextParser(HTMLParser):
+    """Extract page text so markup cannot hide unfinished legal notices."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+        self.hidden = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ("script", "style"):
+            self.hidden += 1
+
+    def handle_endtag(self, tag):
+        if tag in ("script", "style") and self.hidden:
+            self.hidden -= 1
+
+    def handle_data(self, data):
+        if not self.hidden:
+            self.parts.append(data)
+
+
 def contains_draft_marker(content):
-    """Catch HTML-escaped and whitespace-separated draft notices as well as plain text."""
-    decoded = unescape(content.decode("utf-8", errors="replace")).lower()
-    normalized = re.sub(r"\s+", " ", decoded)
+    """Detect draft notices split by HTML tags, entities or whitespace."""
+    parser = VisibleTextParser()
+    parser.feed(content.decode("utf-8", errors="replace"))
+    normalized = re.sub(r"\s+", " ", unescape(" ".join(parser.parts)).lower())
     return any(marker.decode("ascii") in normalized for marker in DRAFT_MARKERS)
 
 

@@ -5,6 +5,7 @@ Does not print environment values or credentials. Run with:
 """
 import ipaddress
 import os
+import re
 import sys
 from html.parser import HTMLParser
 from urllib.parse import urlsplit
@@ -48,15 +49,21 @@ class RobotsParser(HTMLParser):
         if tag != "meta":
             return
         values = dict(attrs)
-        if values.get("name", "").lower() in ("robots", "googlebot", "bingbot"):
+        name = (values.get("name") or "").strip().lower()
+        if name in ("robots", "googlebot", "bingbot"):
             directives = values.get("content") or ""
-            if "noindex" in [part.strip().lower() for part in directives.split(",")]:
+            if contains_noindex(directives):
                 self.noindex = True
 
 
+def contains_noindex(value):
+    """Recognize standalone noindex, including user-agent-scoped HTTP directives."""
+    return any(re.fullmatch(r"(?:[a-z0-9_-]+\s*:\s*)?noindex", item.strip(), re.I)
+               for item in re.split(r"[,;]", value))
+
+
 def has_noindex(content, robots_header=""):
-    directives = [part.strip().lower() for part in robots_header.split(",")]
-    if "noindex" in directives:
+    if contains_noindex(robots_header):
         return True
     parser = RobotsParser()
     parser.feed(content.decode("utf-8", errors="replace"))

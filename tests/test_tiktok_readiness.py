@@ -44,3 +44,28 @@ def test_readiness_rejects_private_reserved_and_placeholder_origins():
     ):
         assert not valid_public_origin(origin), origin
     assert valid_public_origin("https://autoclip.example.com:443")
+
+
+def test_readiness_rejects_oversized_html():
+    def fetch(url):
+        return 200, b"<html>" + b"x" * 256_000, "text/html"
+    assert assess("https://autoclip.example.com", fetch) == [
+        "about_oversized_response", "terms_oversized_response", "privacy_oversized_response"
+    ]
+
+
+def test_redirect_handler_never_follows_redirects():
+    from scripts.check_tiktok_readiness import NoRedirects
+    handler = NoRedirects()
+    assert handler.redirect_request(None, None, 302, "Found", {},
+                                    "http://169.254.169.254/") is None
+    assert handler.redirect_request(None, None, 301, "Moved", {},
+                                    "https://another-domain.com/") is None
+
+
+def test_readiness_rejects_redirect_status():
+    def fetch(url):
+        return 302, b"", "text/html"
+    assert assess("https://autoclip.example.com", fetch) == [
+        "about_http_error", "terms_http_error", "privacy_http_error"
+    ]

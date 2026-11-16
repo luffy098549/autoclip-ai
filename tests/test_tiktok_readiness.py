@@ -221,7 +221,7 @@ def test_readiness_rejects_html_escaped_and_whitespace_split_draft_notices():
     variants = (
         b"<html>LEGAL&#32;DRAFT</html>",
         b"<html>not&#x20;final</html>",
-        b"<html>draft\\nfor\\treview</html>",
+        b"<html>draft\nfor\treview</html>",
     )
     for html in variants:
         def fetch(url):

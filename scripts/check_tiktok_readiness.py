@@ -100,6 +100,10 @@ def assess(origin, fetch):
             result = fetch(origin + path)
             status, content, content_type = result[:3]
             robots_header = result[3] if len(result) > 3 else ""
+            if (type(status) is not int or not isinstance(content, bytes)
+                    or not isinstance(content_type, str)
+                    or not isinstance(robots_header, str)):
+                raise ValueError("malformed response")
         except Exception:
             issues.append(path[1:] + "_unreachable")
             continue

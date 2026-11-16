@@ -119,3 +119,25 @@ def test_readiness_does_not_reject_index_directive():
     def fetch(url):
         return 200, b"<html><meta name='robots' content='index, follow'></html>", "text/html", "index"
     assert assess("https://autoclip.example.com", fetch) == []
+
+
+def test_readiness_rejects_scoped_and_semicolon_robots_directives():
+    def fetch(url):
+        if url.endswith("/about"):
+            return 200, b"<html>About</html>", "text/html"
+        return 200, b"<html>Legal</html>", "text/html", "googlebot: noindex; nofollow"
+    assert assess("https://autoclip.example.com", fetch) == [
+        "terms_legal_noindex", "privacy_legal_noindex"
+    ]
+
+
+def test_readiness_handles_missing_robots_meta_attributes():
+    def fetch(url):
+        return 200, b"<html><meta name><meta name='robots'><meta content='noindex'></html>", "text/html"
+    assert assess("https://autoclip.example.com", fetch) == []
+
+
+def test_readiness_ignores_non_noindex_tokens():
+    def fetch(url):
+        return 200, b"<html><meta name='robots' content='noindexing, index'></html>", "text/html", "notnoindex"
+    assert assess("https://autoclip.example.com", fetch) == []

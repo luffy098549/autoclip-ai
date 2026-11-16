@@ -33,3 +33,14 @@ def test_readiness_accepts_pages_without_draft_markers():
     def fetch(url):
         return 200, b"<!doctype html><html lang='en'>Approved text</html>", "text/html; charset=utf-8"
     assert assess("https://autoclip.example.com", fetch) == []
+
+
+def test_readiness_rejects_private_reserved_and_placeholder_origins():
+    for origin in (
+        "https://10.0.0.1", "https://192.168.1.1", "https://172.16.0.1",
+        "https://169.254.169.254", "https://[::1]", "https://[fc00::1]",
+        "https://example.com:8443", "https://autoclip.example",
+        "https://autoclip.test", "https://internal.local",
+    ):
+        assert not valid_public_origin(origin), origin
+    assert valid_public_origin("https://autoclip.example.com:443")

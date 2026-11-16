@@ -56,6 +56,7 @@ class RobotsParser(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.noindex = False
         self.has_html = False
+        self.meta_refresh = False
 
     def handle_starttag(self, tag, attrs):
         if tag == "html":
@@ -63,6 +64,8 @@ class RobotsParser(HTMLParser):
         if tag != "meta":
             return
         values = dict(attrs)
+        if (values.get("http-equiv") or "").strip().lower() == "refresh":
+            self.meta_refresh = True
         name = (values.get("name") or "").strip().lower()
         if name in ("robots", "googlebot", "bingbot"):
             directives = values.get("content") or ""
@@ -81,6 +84,13 @@ def has_html_root(content):
     parser = RobotsParser()
     parser.feed(content.decode("utf-8", errors="replace"))
     return parser.has_html
+
+
+def has_meta_refresh(content):
+    """Reject HTML pages that immediately redirect through a meta refresh."""
+    parser = RobotsParser()
+    parser.feed(content.decode("utf-8", errors="replace"))
+    return parser.meta_refresh
 
 
 def has_noindex(content, robots_header=""):
@@ -144,6 +154,8 @@ def assess(origin, fetch):
         elif (not has_html_root(content)
               or content_type.split(";", 1)[0].strip().lower() != "text/html"):
             issues.append(path[1:] + "_invalid_html")
+        elif has_meta_refresh(content):
+            issues.append(path[1:] + "_meta_redirect")
         elif path != "/about" and contains_draft_marker(content):
             issues.append(path[1:] + "_legal_draft")
         elif path != "/about" and has_noindex(content, robots_header):

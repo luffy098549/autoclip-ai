@@ -295,3 +295,25 @@ def test_readiness_ignores_non_refresh_http_equiv():
     def fetch(url):
         return 200, b"<html><meta http-equiv='content-type' content='text/html'></html>", "text/html"
     assert assess("https://autoclip.example.com", fetch) == []
+
+
+def test_readiness_rejects_legal_pages_with_no_visible_text():
+    variants = (
+        b"<html><head><title>Terms</title></head><body></body></html>",
+        b"<html><body><!-- policy pending --><script>const text = 'policy';</script><style>body{display:block}</style></body></html>",
+        b"<html><body>  &#32; \t </body></html>",
+    )
+    for html in variants:
+        def fetch(url):
+            if url.endswith("/about"):
+                return 200, b"<html>About</html>", "text/html"
+            return 200, html, "text/html"
+        assert assess("https://autoclip.example.com", fetch) == [
+            "terms_empty_legal_text", "privacy_empty_legal_text"
+        ]
+
+
+def test_readiness_accepts_visible_legal_body_text():
+    def fetch(url):
+        return 200, b"<html><body><p>Policy text is visible.</p></body></html>", "text/html"
+    assert assess("https://autoclip.example.com", fetch) == []

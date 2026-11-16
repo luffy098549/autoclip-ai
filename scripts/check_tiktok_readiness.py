@@ -24,6 +24,16 @@ def valid_public_origin(value):
         host = parsed.hostname
         if not host or host.endswith('.') or '.' not in host or host.endswith(('.local', '.internal', '.test', '.invalid', '.example')):
             return False
+        # Require ordinary public DNS names; reject malformed hosts before network access.
+        # This also rejects numeric-only and percent-encoded hostname tricks.
+        if not host.isascii() or len(host) > 253:
+            return False
+        labels = host.split(".")
+        if any(not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", label, re.I)
+               for label in labels):
+            return False
+        if not re.fullmatch(r"[a-z]{2,63}", labels[-1], re.I):
+            return False
         try:
             if not ipaddress.ip_address(host).is_global:
                 return False

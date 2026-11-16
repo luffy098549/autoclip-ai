@@ -69,3 +69,15 @@ def test_readiness_rejects_redirect_status():
     assert assess("https://autoclip.example.com", fetch) == [
         "about_http_error", "terms_http_error", "privacy_http_error"
     ]
+
+
+def test_readiness_detects_case_insensitive_legal_drafts_and_placeholders():
+    for unfinished in (b"legal draft", b"Not Final", b"DRAFT FOR REVIEW",
+                       b"Lorem Ipsum", b"to be added", b"TO BE FINALIZED"):
+        def fetch(url):
+            if url.endswith("/about"):
+                return 200, b"<html>About</html>", "text/html"
+            return 200, b"<html>" + unfinished + b"</html>", "text/html"
+        assert assess("https://autoclip.example.com", fetch) == [
+            "terms_legal_draft", "privacy_legal_draft"
+        ]

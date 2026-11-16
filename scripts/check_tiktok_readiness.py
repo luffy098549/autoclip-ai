@@ -97,7 +97,8 @@ def assess(origin, fetch):
             issues.append(path[1:] + "_http_error")
         elif len(content) > 256_000:
             issues.append(path[1:] + "_oversized_response")
-        elif (not re.search(rb"<html(?:\\s|>)", content, re.I)\n              or content_type.split(";", 1)[0].strip().lower() != "text/html"):
+        elif (not re.search(rb"<html(?:\s|>)", content, re.I)
+              or content_type.split(";", 1)[0].strip().lower() != "text/html"):
             issues.append(path[1:] + "_invalid_html")
         elif path != "/about" and any(marker in content.lower() for marker in DRAFT_MARKERS):
             issues.append(path[1:] + "_legal_draft")

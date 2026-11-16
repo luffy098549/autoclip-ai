@@ -159,3 +159,23 @@ def test_public_origin_rejects_malformed_dns_names():
         assert not valid_public_origin(origin), origin
     assert valid_public_origin("https://autoclip-ai.example.com")
     assert valid_public_origin("https://autoclip.example.com:443")
+
+
+def test_readiness_rejects_misleading_html_media_types_and_tags():
+    for body, media_type in (
+        (b"<html>OK</html>", "text/html-malicious"),
+        (b"<html>OK</html>", "application/xhtml+xml"),
+        (b"<htmlfake>OK</htmlfake>", "text/html"),
+        (b"<!-- <html -->", "text/plain"),
+    ):
+        def fetch(url):
+            return 200, body, media_type
+        assert assess("https://autoclip.example.com", fetch) == [
+            "about_invalid_html", "terms_invalid_html", "privacy_invalid_html"
+        ]
+
+
+def test_readiness_accepts_case_insensitive_html_content_type_with_parameters():
+    def fetch(url):
+        return 200, b"<HTML lang='en'>Policy</HTML>", " Text/HTML ; charset=utf-8 "
+    assert assess("https://autoclip.example.com", fetch) == []

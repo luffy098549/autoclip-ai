@@ -72,7 +72,7 @@ class RobotsParser(HTMLParser):
 
 def contains_noindex(value):
     """Recognize standalone noindex, including user-agent-scoped HTTP directives."""
-    return any(re.fullmatch(r"(?:[a-z0-9_-]+\s*:\s*)?noindex", item.strip(), re.I)
+    return any(re.fullmatch(r"(?:[a-z0-9_-]+\s*:\s*)?(?:noindex|none)", item.strip(), re.I)
                for item in re.split(r"[,;]", value))
 
 

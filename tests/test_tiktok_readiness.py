@@ -215,3 +215,19 @@ def test_readiness_fails_closed_on_malformed_fetch_results():
         assert assess("https://autoclip.example.com", fetch) == [
             "about_unreachable", "terms_unreachable", "privacy_unreachable"
         ]
+
+
+def test_readiness_rejects_html_escaped_and_whitespace_split_draft_notices():
+    variants = (
+        b"<html>LEGAL&#32;DRAFT</html>",
+        b"<html>not&#x20;final</html>",
+        b"<html>draft\\nfor\\treview</html>",
+    )
+    for html in variants:
+        def fetch(url):
+            if url.endswith("/about"):
+                return 200, b"<html>About</html>", "text/html"
+            return 200, html, "text/html"
+        assert assess("https://autoclip.example.com", fetch) == [
+            "terms_legal_draft", "privacy_legal_draft"
+        ]

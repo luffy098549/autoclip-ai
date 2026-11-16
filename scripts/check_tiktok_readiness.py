@@ -122,6 +122,13 @@ class VisibleTextParser(HTMLParser):
             self.parts.append(data)
 
 
+def visible_page_text(content):
+    """Return normalized visible text, excluding comments, scripts and styles."""
+    parser = VisibleTextParser()
+    parser.feed(content.decode("utf-8", errors="replace"))
+    return re.sub(r"\\s+", " ", unescape(" ".join(parser.parts))).strip()
+
+
 def contains_draft_marker(content):
     """Detect draft notices split by HTML tags, entities or whitespace."""
     parser = VisibleTextParser()
@@ -156,6 +163,8 @@ def assess(origin, fetch):
             issues.append(path[1:] + "_invalid_html")
         elif has_meta_refresh(content):
             issues.append(path[1:] + "_meta_redirect")
+        elif path != "/about" and not visible_page_text(content):
+            issues.append(path[1:] + "_empty_legal_text")
         elif path != "/about" and contains_draft_marker(content):
             issues.append(path[1:] + "_legal_draft")
         elif path != "/about" and has_noindex(content, robots_header):

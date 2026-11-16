@@ -91,3 +91,31 @@ def test_readiness_rejects_legal_pages_with_noindex_meta():
     assert assess("https://autoclip.example.com", fetch) == [
         "terms_legal_noindex", "privacy_legal_noindex"
     ]
+
+
+def test_readiness_rejects_robots_meta_variants_and_header():
+    variants = (
+        b"<html><meta content='follow, noindex' name='ROBOTS'></html>",
+        b"<html><META NAME=googlebot CONTENT='NOINDEX'></html>",
+        b"<html><meta name='bingbot' content='noindex, follow'></html>",
+    )
+    for html in variants:
+        def fetch(url):
+            if url.endswith("/about"):
+                return 200, b"<html>About</html>", "text/html"
+            return 200, html, "text/html"
+        assert assess("https://autoclip.example.com", fetch) == [
+            "terms_legal_noindex", "privacy_legal_noindex"
+        ]
+
+    def header_fetch(url):
+        return 200, b"<html>Legal</html>", "text/html", "noindex, nofollow"
+    assert assess("https://autoclip.example.com", header_fetch) == [
+        "terms_legal_noindex", "privacy_legal_noindex"
+    ]
+
+
+def test_readiness_does_not_reject_index_directive():
+    def fetch(url):
+        return 200, b"<html><meta name='robots' content='index, follow'></html>", "text/html", "index"
+    assert assess("https://autoclip.example.com", fetch) == []

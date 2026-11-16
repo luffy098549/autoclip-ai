@@ -81,3 +81,13 @@ def test_readiness_detects_case_insensitive_legal_drafts_and_placeholders():
         assert assess("https://autoclip.example.com", fetch) == [
             "terms_legal_draft", "privacy_legal_draft"
         ]
+
+
+def test_readiness_rejects_legal_pages_with_noindex_meta():
+    def fetch(url):
+        if url.endswith("/about"):
+            return 200, b"<html>About</html>", "text/html"
+        return (200, b'<html><head><meta name="robots" content="noindex, nofollow"></head><body>Terms</body></html>', "text/html")
+    assert assess("https://autoclip.example.com", fetch) == [
+        "terms_legal_noindex", "privacy_legal_noindex"
+    ]

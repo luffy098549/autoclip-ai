@@ -55,6 +55,8 @@ def assess(origin, fetch):
             issues.append(path[1:] + "_invalid_html")
         elif path != "/about" and any(marker in content.lower() for marker in DRAFT_MARKERS):
             issues.append(path[1:] + "_legal_draft")
+        elif path != "/about" and b'<meta name="robots" content="noindex' in content.lower():
+            issues.append(path[1:] + "_legal_noindex")
     return issues
 
 

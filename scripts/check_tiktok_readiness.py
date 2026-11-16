@@ -94,7 +94,7 @@ def has_noindex(content, robots_header=""):
 def contains_draft_marker(content):
     """Catch HTML-escaped and whitespace-separated draft notices as well as plain text."""
     decoded = unescape(content.decode("utf-8", errors="replace")).lower()
-    normalized = re.sub(r"\\s+", " ", decoded)
+    normalized = re.sub(r"\s+", " ", decoded)
     return any(marker.decode("ascii") in normalized for marker in DRAFT_MARKERS)
 
 

@@ -231,3 +231,30 @@ def test_readiness_rejects_html_escaped_and_whitespace_split_draft_notices():
         assert assess("https://autoclip.example.com", fetch) == [
             "terms_legal_draft", "privacy_legal_draft"
         ]
+
+
+def test_readiness_detects_draft_notice_split_by_html_tags():
+    variants = (
+        b"<html><body>Legal <strong>draft</strong></body></html>",
+        b"<html><body>Not <span>final</span></body></html>",
+        b"<html><body>Draft <em>for</em> review</body></html>",
+    )
+    for html in variants:
+        def fetch(url):
+            if url.endswith("/about"):
+                return 200, b"<html>About</html>", "text/html"
+            return 200, html, "text/html"
+        assert assess("https://autoclip.example.com", fetch) == [
+            "terms_legal_draft", "privacy_legal_draft"
+        ]
+
+
+def test_readiness_ignores_draft_words_in_comments_and_scripts():
+    html = (b"<html><body>Final legal text"
+            b"<!-- LEGAL DRAFT -->"
+            b"<script>const note = 'not final';</script>"
+            b"<style>/* draft for review */</style>"
+            b"</body></html>")
+    def fetch(url):
+        return 200, html, "text/html"
+    assert assess("https://autoclip.example.com", fetch) == []

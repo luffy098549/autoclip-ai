@@ -179,3 +179,22 @@ def test_readiness_accepts_case_insensitive_html_content_type_with_parameters():
     def fetch(url):
         return 200, b"<HTML lang='en'>Policy</HTML>", " Text/HTML ; charset=utf-8 "
     assert assess("https://autoclip.example.com", fetch) == []
+
+
+def test_readiness_rejects_html_root_spoofed_in_comments_and_scripts():
+    for fake_html in (
+        b"<!-- <html>fake</html> -->",
+        b"<script>const markup = '<html>fake</html>';</script>",
+        b"<div data-example='<html>fake</html>'>Not an HTML document</div>",
+    ):
+        def fetch(url):
+            return 200, fake_html, "text/html"
+        assert assess("https://autoclip.example.com", fetch) == [
+            "about_invalid_html", "terms_invalid_html", "privacy_invalid_html"
+        ]
+
+
+def test_readiness_accepts_real_html_root_after_comment():
+    def fetch(url):
+        return 200, b"<!-- <html>example</html> --><html><body>Real policy</body></html>", "text/html"
+    assert assess("https://autoclip.example.com", fetch) == []

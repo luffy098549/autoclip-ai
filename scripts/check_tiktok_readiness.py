@@ -7,6 +7,7 @@ import ipaddress
 import os
 import re
 import sys
+from html import unescape
 from html.parser import HTMLParser
 from urllib.parse import urlsplit
 from urllib.error import HTTPError
@@ -90,6 +91,13 @@ def has_noindex(content, robots_header=""):
     return parser.noindex
 
 
+def contains_draft_marker(content):
+    """Catch HTML-escaped and whitespace-separated draft notices as well as plain text."""
+    decoded = unescape(content.decode("utf-8", errors="replace")).lower()
+    normalized = re.sub(r"\\s+", " ", decoded)
+    return any(marker.decode("ascii") in normalized for marker in DRAFT_MARKERS)
+
+
 def assess(origin, fetch):
     """Return issue codes only; never echo page contents, URLs or tokens."""
     issues = []
@@ -114,7 +122,7 @@ def assess(origin, fetch):
         elif (not has_html_root(content)
               or content_type.split(";", 1)[0].strip().lower() != "text/html"):
             issues.append(path[1:] + "_invalid_html")
-        elif path != "/about" and any(marker in content.lower() for marker in DRAFT_MARKERS):
+        elif path != "/about" and contains_draft_marker(content):
             issues.append(path[1:] + "_legal_draft")
         elif path != "/about" and has_noindex(content, robots_header):
             issues.append(path[1:] + "_legal_noindex")

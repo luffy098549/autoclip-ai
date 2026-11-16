@@ -54,8 +54,11 @@ class RobotsParser(HTMLParser):
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.noindex = False
+        self.has_html = False
 
     def handle_starttag(self, tag, attrs):
+        if tag == "html":
+            self.has_html = True
         if tag != "meta":
             return
         values = dict(attrs)
@@ -70,6 +73,13 @@ def contains_noindex(value):
     """Recognize standalone noindex, including user-agent-scoped HTTP directives."""
     return any(re.fullmatch(r"(?:[a-z0-9_-]+\s*:\s*)?noindex", item.strip(), re.I)
                for item in re.split(r"[,;]", value))
+
+
+def has_html_root(content):
+    """Reject fake HTML roots in comments, scripts and attributes."""
+    parser = RobotsParser()
+    parser.feed(content.decode("utf-8", errors="replace"))
+    return parser.has_html
 
 
 def has_noindex(content, robots_header=""):
@@ -97,7 +107,7 @@ def assess(origin, fetch):
             issues.append(path[1:] + "_http_error")
         elif len(content) > 256_000:
             issues.append(path[1:] + "_oversized_response")
-        elif (not re.search(rb"<html(?:\s|>)", content, re.I)
+        elif (not has_html_root(content)
               or content_type.split(";", 1)[0].strip().lower() != "text/html"):
             issues.append(path[1:] + "_invalid_html")
         elif path != "/about" and any(marker in content.lower() for marker in DRAFT_MARKERS):

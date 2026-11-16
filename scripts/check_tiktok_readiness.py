@@ -3,6 +3,7 @@
 Does not print environment values or credentials. Run with:
     python -m scripts.check_tiktok_readiness
 """
+import ipaddress
 import os
 import sys
 from urllib.parse import urlsplit
@@ -17,8 +18,17 @@ def valid_public_origin(value):
         return False
     try:
         parsed = urlsplit(value)
+        host = parsed.hostname
+        if not host or host.endswith('.') or '.' not in host or host.endswith(('.local', '.internal', '.test', '.invalid', '.example')):
+            return False
+        try:
+            if not ipaddress.ip_address(host).is_global:
+                return False
+        except ValueError:
+            pass  # DNS names are allowed; the operator must control the domain.
         return (parsed.scheme == "https" and bool(parsed.hostname)
                 and parsed.username is None and parsed.password is None
+                and parsed.port in (None, 443)
                 and not parsed.path.strip("/") and not parsed.query and not parsed.fragment
                 and parsed.hostname not in ("localhost", "127.0.0.1", "::1"))
     except ValueError:

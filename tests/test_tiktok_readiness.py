@@ -276,3 +276,22 @@ def test_readiness_rejects_robots_none_meta():
     assert assess("https://autoclip.example.com", fetch) == [
         "terms_legal_noindex", "privacy_legal_noindex"
     ]
+
+
+def test_readiness_rejects_meta_refresh_redirects():
+    variants = (
+        b"<html><head><meta http-equiv='refresh' content='0; url=https://other.example.com'></head></html>",
+        b'<html><META CONTENT="5;url=/elsewhere" HTTP-EQUIV="REFRESH"></html>',
+    )
+    for html in variants:
+        def fetch(url):
+            return 200, html, "text/html"
+        assert assess("https://autoclip.example.com", fetch) == [
+            "about_meta_redirect", "terms_meta_redirect", "privacy_meta_redirect"
+        ]
+
+
+def test_readiness_ignores_non_refresh_http_equiv():
+    def fetch(url):
+        return 200, b"<html><meta http-equiv='content-type' content='text/html'></html>", "text/html"
+    assert assess("https://autoclip.example.com", fetch) == []

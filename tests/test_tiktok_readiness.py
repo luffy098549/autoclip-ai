@@ -258,3 +258,21 @@ def test_readiness_ignores_draft_words_in_comments_and_scripts():
     def fetch(url):
         return 200, html, "text/html"
     assert assess("https://autoclip.example.com", fetch) == []
+
+
+def test_readiness_rejects_robots_none_directive():
+    """Robots 'none' is equivalent to noindex,nofollow for review pages."""
+    for directive in ("none", "NONE, follow", "googlebot: none"):
+        def fetch(url):
+            return 200, b"<html><body>Final policy</body></html>", "text/html", directive
+        assert assess("https://autoclip.example.com", fetch) == [
+            "terms_legal_noindex", "privacy_legal_noindex"
+        ]
+
+
+def test_readiness_rejects_robots_none_meta():
+    def fetch(url):
+        return 200, b"<html><meta name='robots' content='none'></html>", "text/html"
+    assert assess("https://autoclip.example.com", fetch) == [
+        "terms_legal_noindex", "privacy_legal_noindex"
+    ]

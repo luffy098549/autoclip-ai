@@ -11,7 +11,7 @@ from urllib.error import HTTPError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 PATHS = ("/about", "/terms", "/privacy")
-DRAFT_MARKERS = (b"LEGAL DRAFT", b"NOT FINAL", b"Draft for review")
+DRAFT_MARKERS = (b"legal draft", b"not final", b"draft for review", b"placeholder", b"lorem ipsum", b"to be added", b"to be finalized")
 
 
 def valid_public_origin(value):
@@ -53,7 +53,7 @@ def assess(origin, fetch):
             issues.append(path[1:] + "_oversized_response")
         elif b"<html" not in content.lower() or "text/html" not in content_type.lower():
             issues.append(path[1:] + "_invalid_html")
-        elif path != "/about" and any(marker in content for marker in DRAFT_MARKERS):
+        elif path != "/about" and any(marker in content.lower() for marker in DRAFT_MARKERS):
             issues.append(path[1:] + "_legal_draft")
     return issues
 

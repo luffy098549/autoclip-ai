@@ -141,3 +141,21 @@ def test_readiness_ignores_non_noindex_tokens():
     def fetch(url):
         return 200, b"<html><meta name='robots' content='noindexing, index'></html>", "text/html", "notnoindex"
     assert assess("https://autoclip.example.com", fetch) == []
+
+
+def test_public_origin_rejects_malformed_dns_names():
+    for origin in (
+        "https://bad_host.example.com",
+        "https://-bad.example.com",
+        "https://bad-.example.com",
+        "https://example.123",
+        "https://example.com%2f.evil.com",
+        "https://example..com",
+        "https://example.c",
+        "https://éxample.com",
+        "https://999.999.999.999",
+        "https://example.com\\\\@evil.com",
+    ):
+        assert not valid_public_origin(origin), origin
+    assert valid_public_origin("https://autoclip-ai.example.com")
+    assert valid_public_origin("https://autoclip.example.com:443")

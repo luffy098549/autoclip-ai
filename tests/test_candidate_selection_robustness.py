@@ -47,7 +47,7 @@ def test_overflowing_duration_is_not_selected():
     # Negative start is independently invalid; check a positive start too.
     positive = Candidate(0.0, 1e308, 90)
     valid = Candidate(1.0, 2.0, 80)
-    assert select_candidates([huge, positive, valid], threshold=75) == [positive]
+    # Both huge windows cannot be represented in millisecond output.\n    assert select_candidates([huge, positive, valid], threshold=75) == [valid]
 
 
 def test_finite_but_submillisecond_duration_at_large_offset():
@@ -67,3 +67,15 @@ def test_overlap_uses_rendered_millisecond_boundaries():
     second = Candidate(0.0013, 0.0033, 98)
     third = Candidate(0.0051, 0.0073, 80)
     assert select_candidates([first, second, third], max_overlap_ratio=0.45) == [first, third]
+
+
+@pytest.mark.parametrize("overlap", [-0.1, 1.1, True, None, "0.25", math.inf, math.nan, 10 ** 1000])
+def test_invalid_overlap_rejected(overlap):
+    with pytest.raises(ValueError):
+        select_candidates([Candidate(0, 20, 90)], max_overlap_ratio=overlap)
+
+
+def test_extremely_large_positive_start_is_skipped_without_overflow():
+    unrenderable = Candidate(1e308, 1.1e308, 99)
+    valid = Candidate(0, 10, 80)
+    assert select_candidates([unrenderable, valid]) == [valid]

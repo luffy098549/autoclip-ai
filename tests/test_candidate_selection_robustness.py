@@ -47,7 +47,7 @@ def test_overflowing_duration_is_not_selected():
     # Negative start is independently invalid; check a positive start too.
     positive = Candidate(0.0, 1e308, 90)
     valid = Candidate(1.0, 2.0, 80)
-    # Both huge windows cannot be represented in millisecond output.\n    assert select_candidates([huge, positive, valid], threshold=75) == [valid]
+    # Both huge windows exceed the supported one-day clip duration.\n    assert select_candidates([huge, positive, valid], threshold=75) == [valid]
 
 
 def test_finite_but_submillisecond_duration_at_large_offset():
@@ -79,3 +79,9 @@ def test_extremely_large_positive_start_is_skipped_without_overflow():
     unrenderable = Candidate(1e308, 1.1e308, 99)
     valid = Candidate(0, 10, 80)
     assert select_candidates([unrenderable, valid]) == [valid]
+
+
+def test_duration_limit_accepts_one_day_and_rejects_longer():
+    allowed = Candidate(0, 86400, 90)
+    too_long = Candidate(0, 86400.001, 99)
+    assert select_candidates([too_long, allowed]) == [allowed]

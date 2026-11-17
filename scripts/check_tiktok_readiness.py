@@ -126,7 +126,7 @@ def visible_page_text(content):
     """Return normalized visible text, excluding comments, scripts and styles."""
     parser = VisibleTextParser()
     parser.feed(content.decode("utf-8", errors="replace"))
-    return re.sub(r"\\s+", " ", unescape(" ".join(parser.parts))).strip()
+    return re.sub(r"\s+", " ", unescape(" ".join(parser.parts))).strip()
 
 
 def contains_draft_marker(content):

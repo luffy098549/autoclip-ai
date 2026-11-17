@@ -32,7 +32,11 @@ def build_srt(segments: list[dict]) -> str:
         end = float(segment["end"])
         if end <= start:
             raise ValueError("Subtitle end must follow its start")
-        text = str(segment["text"]).strip().replace("\r", " ").replace("\x00", "")
+        # Millisecond rounding must not turn a positive cue into zero duration.
+        if start_stamp == end_stamp:
+            raise ValueError("Subtitle interval is too short for SRT millisecond precision")
+        # Keep user text within one cue; blank lines could impersonate SRT blocks.
+        text = " ".join(str(segment["text"]).replace("\x00", "").split())
         if not text:
             continue
         blocks.append(f"{len(blocks) + 1}\n{start_stamp} --> {end_stamp}\n{text}")

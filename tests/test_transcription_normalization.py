@@ -17,6 +17,8 @@ def test_transcribe_skips_malformed_and_zero_length_cues(tmp_path, monkeypatch):
         SimpleNamespace(start=2.0, end=2.0001, text="too short"),
         SimpleNamespace(start=float("nan"), end=3.0, text="invalid"),
         SimpleNamespace(start=-1.0, end=1.0, text="negative"),
+        SimpleNamespace(start=True, end=2.0, text="boolean start"),
+        SimpleNamespace(start=1.0, end=False, text="boolean end"),
         SimpleNamespace(start="bad", end=2.0, text="invalid"),
         SimpleNamespace(start=1e308, end=1.1e308, text="overflow"),
         SimpleNamespace(start=4.0, end=5.0, text="safe\x00 text"),

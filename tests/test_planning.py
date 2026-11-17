@@ -138,3 +138,61 @@ def test_planning_rejects_nonintegral_clip_ids(portal, bad_id):
     assert response.status_code == 400
     with client.application.app_context():
         assert Publication.query.count() == 0
+
+
+def test_reschedule_draft_without_publishing(portal):
+    client, cid = portal
+    sign_in(client)
+    first = plan(client, cid)
+    assert first.status_code == 201
+    pid = first.json["item"]["id"]
+    response = client.post(f"/api/plans/{pid}/reschedule", json={
+        "scheduled_local": "2099-10-05T14:00",
+    })
+    assert response.status_code == 200
+    assert response.json["item"]["scheduled_local"] == "2099-10-05T14:00"
+    assert response.json["item"]["state"] == "planned"
+    assert client.get("/api/plans").json["publishing_enabled"] is False
+    with client.application.app_context():
+        assert Publication.query.count() == 1
+
+
+def test_reschedule_rejects_conflicts_and_preserves_original(portal):
+    client, cid = portal
+    sign_in(client)
+    first = plan(client, cid)
+    second = plan(client, cid, "2099-10-05T14:00")
+    assert first.status_code == second.status_code == 201
+    pid = first.json["item"]["id"]
+    conflict = client.post(f"/api/plans/{pid}/reschedule", json={
+        "scheduled_local": "2099-10-05T13:00",
+    })
+    assert conflict.status_code == 409
+    listing = client.get("/api/plans").json["items"]
+    assert next(p for p in listing if p["id"] == pid)["scheduled_local"] == "2099-10-05T10:00"
+
+
+@pytest.mark.parametrize("payload", [None, [], "bad", {}, {"scheduled_local": "2000-01-01T00:00"}])
+def test_reschedule_rejects_invalid_requests(portal, payload):
+    client, cid = portal
+    sign_in(client)
+    pid = plan(client, cid).json["item"]["id"]
+    response = client.post(f"/api/plans/{pid}/reschedule", json=payload)
+    assert response.status_code == 400
+    assert client.get("/api/plans").json["items"][0]["scheduled_local"] == "2099-10-05T10:00"
+
+
+def test_reschedule_requires_admin_and_pending_draft(portal):
+    client, cid = portal
+    assert client.post("/api/plans/1/reschedule", json={
+        "scheduled_local": "2099-10-05T14:00",
+    }).status_code == 401
+    sign_in(client)
+    assert client.post("/api/plans/999/reschedule", json={
+        "scheduled_local": "2099-10-05T14:00",
+    }).status_code == 404
+    pid = plan(client, cid).json["item"]["id"]
+    assert client.post(f"/api/plans/{pid}/cancel").status_code == 200
+    assert client.post(f"/api/plans/{pid}/reschedule", json={
+        "scheduled_local": "2099-10-05T14:00",
+    }).status_code == 409

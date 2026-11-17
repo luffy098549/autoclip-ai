@@ -136,3 +136,50 @@ def cancel_plan(plan_id):
     item.state = "canceled"
     db.session.commit()
     return jsonify(item=_serialize(item), message="Borrador cancelado")
+
+
+@planning_bp.post("/plans/<int:plan_id>/reschedule")
+@admin_only
+def reschedule_plan(plan_id):
+    """Move an unpublished local draft without triggering external publication."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(error="Se requiere un objeto JSON válido"), 400
+    try:
+        proposed = _parse_ny_time(data.get("scheduled_local"))
+    except (ValueError, TypeError, OverflowError) as exc:
+        return jsonify(error=str(exc) or "Horario inválido"), 400
+    if proposed <= datetime.now(timezone.utc):
+        return jsonify(error="El horario debe estar en el futuro"), 400
+
+    try:
+        item = db.session.get(Publication, plan_id)
+        if item is None:
+            return jsonify(error="Plan no encontrado"), 404
+        if item.state != "planned":
+            return jsonify(error="Solo se pueden modificar borradores pendientes"), 409
+        if item.platform not in PLATFORMS:
+            return jsonify(error="Plataforma no válida"), 400
+        if db.engine.dialect.name == "postgresql":
+            lock_keys = {"youtube": 100091, "tiktok": 100092, "instagram": 100093}
+            db.session.execute(
+                text("SELECT pg_advisory_xact_lock(:key)"),
+                {"key": lock_keys[item.platform]},
+            )
+            # Reload after acquiring the lock so concurrent changes are visible.
+            db.session.refresh(item)
+            if item.state != "planned":
+                return jsonify(error="Solo se pueden modificar borradores pendientes"), 409
+        existing = Publication.query.filter(
+            Publication.platform == item.platform,
+            Publication.state.in_(ACTIVE_STATES),
+            Publication.id != item.id,
+        ).all()
+        if not can_schedule(proposed, [_to_utc(p.scheduled_at) for p in existing]):
+            return jsonify(error="Mínimo 120 minutos entre planes y 5 al día por red"), 409
+        item.scheduled_at = proposed
+        db.session.commit()
+        return jsonify(item=_serialize(item), message="Borrador reprogramado sin publicar")
+    except Exception:
+        db.session.rollback()
+        raise

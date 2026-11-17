@@ -18,7 +18,7 @@ def test_transcribe_skips_malformed_and_zero_length_cues(tmp_path, monkeypatch):
         SimpleNamespace(start=float("nan"), end=3.0, text="invalid"),
         SimpleNamespace(start=-1.0, end=1.0, text="negative"),
         SimpleNamespace(start="bad", end=2.0, text="invalid"),
-        SimpleNamespace(start=4.0, end=5.0, text="safe\\x00 text"),
+        SimpleNamespace(start=4.0, end=5.0, text="safe\x00 text"),
     ]
 
     class FakeModel:

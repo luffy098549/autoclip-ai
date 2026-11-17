@@ -82,3 +82,37 @@ def test_invalid_past_and_nonexistent_clip(portal):
     assert plan(client,cid,"2000-01-01T10:00").status_code==400
     assert plan(client,999).status_code==400
     assert plan(client,cid,"2099-10-05T10:00","random").status_code==400
+
+
+@pytest.mark.parametrize("location", ["outside", "nested", "wrong_extension", "symlink"])
+def test_planning_rejects_unmanaged_render_paths(portal, tmp_path, location):
+    client, cid = portal
+    sign_in(client)
+    # The fixture creates its own MEDIA_ROOT; derive it from the current clip.
+    from app.models import Clip, db
+    from flask import current_app
+    app = client.application
+    with app.app_context():
+        clip = db.session.get(Clip, cid)
+        clips = Path(current_app.config["MEDIA_ROOT"]) / "clips"
+        if location == "outside":
+            target = clips.parent / "outside.mp4"
+            target.write_bytes(b"test")
+        elif location == "nested":
+            folder = clips / "nested"
+            folder.mkdir()
+            target = folder / "nested.mp4"
+            target.write_bytes(b"test")
+        elif location == "wrong_extension":
+            target = clips / "wrong.txt"
+            target.write_bytes(b"test")
+        else:
+            original = clips.parent / "outside.mp4"
+            original.write_bytes(b"test")
+            target = clips / "linked.mp4"
+            target.symlink_to(original)
+        clip.output_path = str(target)
+        db.session.commit()
+    assert plan(client, cid).status_code == 400
+    with app.app_context():
+        assert Publication.query.count() == 0

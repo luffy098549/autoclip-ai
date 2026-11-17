@@ -116,3 +116,25 @@ def test_planning_rejects_unmanaged_render_paths(portal, tmp_path, location):
     assert plan(client, cid).status_code == 400
     with app.app_context():
         assert Publication.query.count() == 0
+
+
+@pytest.mark.parametrize("payload", [None, [], [1], "text", 42, True])
+def test_planning_rejects_non_object_json(portal, payload):
+    client, cid = portal
+    sign_in(client)
+    response = client.post("/api/plans", json=payload)
+    assert response.status_code == 400
+    assert "error" in response.json
+
+
+@pytest.mark.parametrize("bad_id", [True, False, 1.5, "1.0", "-1", "1e2", [], {}, None])
+def test_planning_rejects_nonintegral_clip_ids(portal, bad_id):
+    client, cid = portal
+    sign_in(client)
+    response = client.post("/api/plans", json={
+        "clip_id": bad_id, "platform": "youtube",
+        "scheduled_local": "2099-10-05T10:00",
+    })
+    assert response.status_code == 400
+    with client.application.app_context():
+        assert Publication.query.count() == 0

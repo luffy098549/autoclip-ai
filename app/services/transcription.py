@@ -35,7 +35,7 @@ def transcribe_file(path: str, *, model_size: str | None = None,
         start_ms, end_ms = round(start * 1000), round(end * 1000)
         if end_ms <= start_ms:
             continue
-        text = str(seg.text).replace("\\x00", "").strip()
+        text = str(seg.text).replace("\x00", "").strip()
         if text:
             cleaned.append({"start": start_ms / 1000,
                             "end": end_ms / 1000, "text": text})

@@ -63,9 +63,8 @@ def test_submillisecond_positive_window_collapses_after_quantization():
 
 
 def test_overlap_uses_rendered_millisecond_boundaries():
-    # Floating-point windows barely overlap, but millisecond truncation
-    # makes the first two share the same 1 ms of rendered media.
-    first = Candidate(0.0001, 0.0019, 99)
-    second = Candidate(0.0011, 0.0029, 98)
-    third = Candidate(0.0031, 0.0049, 80)
-    assert select_candidates([first, second, third], max_overlap_ratio=0) == [first, third]
+    # Float overlap is 40%, but rendered millisecond overlap is 50%.
+    first = Candidate(0.0001, 0.0021, 99)
+    second = Candidate(0.0013, 0.0033, 98)
+    third = Candidate(0.0051, 0.0073, 80)
+    assert select_candidates([first, second, third], max_overlap_ratio=0.45) == [first, third]

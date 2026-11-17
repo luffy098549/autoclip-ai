@@ -131,13 +131,25 @@ def clips():
             "end": c.end_seconds, "status": c.editorial_status, "score": c.score,
             "has_subtitles": (Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{c.id}.srt").is_file()
         } for c in items])
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(error="Se requiere un objeto JSON válido"), 400
     try:
-        source_id = int(data.get("source_id"))
-        start = float(data.get("start"))
-        end = float(data.get("end"))
-    except (ValueError, TypeError):
-        return jsonify(error="source_id, start y end deben ser números"), 400
+        raw_id = data.get("source_id")
+        if (isinstance(raw_id, bool) or not isinstance(raw_id, (int, str))
+                or not str(raw_id).isascii() or not str(raw_id).isdecimal()):
+            raise ValueError("ID de fuente inválido")
+        source_id = int(raw_id)
+        if source_id <= 0:
+            raise ValueError("ID de fuente inválido")
+        raw_start, raw_end = data.get("start"), data.get("end")
+        if (isinstance(raw_start, bool) or isinstance(raw_end, bool)
+                or not isinstance(raw_start, (int, float))
+                or not isinstance(raw_end, (int, float))):
+            raise ValueError("Los tiempos deben ser números")
+        start, end = float(raw_start), float(raw_end)
+    except (ValueError, TypeError, OverflowError):
+        return jsonify(error="source_id, start y end deben ser números válidos"), 400
     if not (math.isfinite(start) and math.isfinite(end) and 0 <= start < end <= start + 180):
         return jsonify(error="Duración inválida: máximo 180 segundos"), 400
     source = db.session.get(MediaSource, source_id)
@@ -215,11 +227,15 @@ def download_subtitles(clip_id):
     source = db.session.get(MediaSource, clip.source_id)
     if source is None or not assess_rights(source.rights_status, source.permission_evidence).allowed:
         return jsonify(error="No se pueden descargar subtítulos sin autorización"), 403
-    path = Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{clip_id}.srt"
-    if not path.is_file():
+    subtitles_root = (Path(current_app.config["MEDIA_ROOT"]) / "subtitles").resolve()
+    path = (subtitles_root / f"clip-{clip_id}.srt").resolve()
+    if path.parent != subtitles_root or not path.is_file() or path.suffix.lower() != ".srt":
         return jsonify(error="Subtítulos no disponibles"), 404
-    return send_file(path, as_attachment=True, download_name=f"autoclip-{clip.id}.srt",
-                     mimetype="application/x-subrip")
+    response = send_file(path, as_attachment=True,
+                         download_name=f"autoclip-{clip.id}.srt",
+                         mimetype="application/x-subrip")
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
 
 
 @api_bp.route("/analytics", methods=["GET", "POST"])

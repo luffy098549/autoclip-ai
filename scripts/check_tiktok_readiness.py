@@ -110,11 +110,11 @@ class VisibleTextParser(HTMLParser):
         self.hidden = 0
 
     def handle_starttag(self, tag, attrs):
-        if tag in ("head", "script", "style"):
+        if tag in ("head", "script", "style", "template", "noscript"):
             self.hidden += 1
 
     def handle_endtag(self, tag):
-        if tag in ("head", "script", "style") and self.hidden:
+        if tag in ("head", "script", "style", "template", "noscript") and self.hidden:
             self.hidden -= 1
 
     def handle_data(self, data):

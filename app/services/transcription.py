@@ -1,5 +1,6 @@
 """Optional local speech-to-text via faster-whisper. No cloud upload."""
 import os
+import math
 from pathlib import Path
 
 
@@ -24,8 +25,18 @@ def transcribe_file(path: str, *, model_size: str | None = None,
     segments, info = model.transcribe(str(source), vad_filter=True, beam_size=5)
     cleaned = []
     for seg in segments:
-        text = seg.text.strip()
-        if text and seg.end > seg.start:
-            cleaned.append({"start":round(float(seg.start), 3),
-                            "end":round(float(seg.end), 3), "text":text})
+        # Reject malformed and sub-millisecond cues before storing metadata.
+        try:
+            start, end = float(seg.start), float(seg.end)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if not (math.isfinite(start) and math.isfinite(end) and 0 <= start < end):
+            continue
+        start_ms, end_ms = round(start * 1000), round(end * 1000)
+        if end_ms <= start_ms:
+            continue
+        text = str(seg.text).replace("\\x00", "").strip()
+        if text:
+            cleaned.append({"start": start_ms / 1000,
+                            "end": end_ms / 1000, "text": text})
     return {"language":info.language or "unknown", "segments":cleaned}

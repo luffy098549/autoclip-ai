@@ -333,3 +333,27 @@ def test_visible_text_collapses_unicode_whitespace():
     from scripts.check_tiktok_readiness import visible_page_text
     content = "<html><body>Privacy\u2003policy\n\ttext</body></html>".encode("utf-8")
     assert visible_page_text(content) == "Privacy policy text"
+
+
+def test_readiness_ignores_inert_template_and_noscript_content():
+    """Inert markup must not count as published legal text or a draft notice."""
+    from scripts.check_tiktok_readiness import visible_page_text
+    inert = (b"<html><body><template>LEGAL DRAFT</template>"
+             b"<noscript>not final</noscript></body></html>")
+    assert visible_page_text(inert) == ""
+
+    def fetch(url):
+        if url.endswith("/about"):
+            return 200, b"<html><body>About</body></html>", "text/html"
+        return 200, inert, "text/html"
+    assert assess("https://autoclip.example.com", fetch) == [
+        "terms_empty_legal_text", "privacy_empty_legal_text"
+    ]
+
+
+def test_readiness_does_not_treat_inert_draft_markers_as_visible():
+    def fetch(url):
+        return (200, b"<html><body>Final legal policy"
+                b"<template>LEGAL DRAFT</template>"
+                b"<noscript>not final</noscript></body></html>", "text/html")
+    assert assess("https://autoclip.example.com", fetch) == []

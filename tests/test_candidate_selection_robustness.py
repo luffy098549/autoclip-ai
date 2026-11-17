@@ -34,3 +34,22 @@ def test_overlap_rejects_near_duplicate_windows():
     duplicate = Candidate(5, 35, 94)
     independent = Candidate(40, 65, 80)
     assert select_candidates([duplicate, independent, high]) == [high, independent]
+
+
+def test_submillisecond_window_is_not_selected():
+    tiny = Candidate(0.0, 0.0005, 100)
+    valid = Candidate(1.0, 2.0, 80)
+    assert select_candidates([tiny, valid]) == [valid]
+
+
+def test_overflowing_duration_is_not_selected():
+    huge = Candidate(-1e308, 1e308, 100)
+    # Negative start is independently invalid; check a positive start too.
+    positive = Candidate(0.0, 1e308, 90)
+    valid = Candidate(1.0, 2.0, 80)
+    assert select_candidates([huge, positive, valid], threshold=75) == [positive, valid]
+
+
+def test_finite_but_submillisecond_duration_at_large_offset():
+    tiny = Candidate(1000.0, 1000.0001, 99)
+    assert select_candidates([tiny]) == []

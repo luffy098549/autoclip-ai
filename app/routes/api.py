@@ -354,6 +354,8 @@ def source_transcript(source_id):
     source = db.session.get(MediaSource, source_id)
     if not source:
         return jsonify(error="Fuente inexistente"), 404
+    if not assess_rights(source.rights_status, source.permission_evidence).allowed:
+        return jsonify(error="Fuente sin autorización válida"), 403
     from ..models import TranscriptSegment
     entries = TranscriptSegment.query.filter_by(source_id=source.id).order_by(
         TranscriptSegment.start_seconds.asc(), TranscriptSegment.id.asc()

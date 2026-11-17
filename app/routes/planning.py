@@ -62,12 +62,17 @@ def plans():
                        publishing_enabled=False,
                        note="Solo borradores locales: ningún video se publica.")
 
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(error="Se requiere un objeto JSON válido"), 400
     platform = str(data.get("platform", "")).strip().lower()
     if platform not in PLATFORMS:
         return jsonify(error="Selecciona YouTube, TikTok o Instagram"), 400
     try:
-        clip_id = int(data.get("clip_id"))
+        raw_clip_id = data.get("clip_id")
+        if isinstance(raw_clip_id, bool) or not isinstance(raw_clip_id, (str, int)) or not re.fullmatch(r"[0-9]+", str(raw_clip_id)):
+            raise ValueError("Selecciona un clip válido")
+        clip_id = int(raw_clip_id)
         proposed = _parse_ny_time(data.get("scheduled_local"))
     except (ValueError, TypeError, OverflowError) as exc:
         return jsonify(error=str(exc) or "Datos inválidos"), 400

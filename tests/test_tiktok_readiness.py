@@ -317,3 +317,19 @@ def test_readiness_accepts_visible_legal_body_text():
     def fetch(url):
         return 200, b"<html><body><p>Policy text is visible.</p></body></html>", "text/html"
     assert assess("https://autoclip.example.com", fetch) == []
+
+
+def test_readiness_rejects_legal_text_containing_only_unicode_whitespace():
+    def fetch(url):
+        if url.endswith("/about"):
+            return 200, b"<html><body>About</body></html>", "text/html"
+        return 200, "<html><body>\u2003\u00a0\u2009</body></html>".encode("utf-8"), "text/html"
+    assert assess("https://autoclip.example.com", fetch) == [
+        "terms_empty_legal_text", "privacy_empty_legal_text"
+    ]
+
+
+def test_visible_text_collapses_unicode_whitespace():
+    from scripts.check_tiktok_readiness import visible_page_text
+    content = "<html><body>Privacy\u2003policy\n\ttext</body></html>".encode("utf-8")
+    assert visible_page_text(content) == "Privacy policy text"

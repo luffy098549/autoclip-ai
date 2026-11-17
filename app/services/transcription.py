@@ -42,7 +42,10 @@ def transcribe_file(path: str, *, model_size: str | None = None,
         start_ms, end_ms = round(scaled_start), round(scaled_end)
         if end_ms <= start_ms:
             continue
-        text = str(seg.text).replace("\x00", "").strip()
+        raw_text = getattr(seg, "text", None)
+        if raw_text is None:
+            continue
+        text = str(raw_text).replace("\x00", "").strip()
         if text:
             cleaned.append({"start": start_ms / 1000,
                             "end": end_ms / 1000, "text": text})

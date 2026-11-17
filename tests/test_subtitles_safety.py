@@ -32,3 +32,21 @@ def test_build_srt_rejects_invalid_intervals(start, end):
 
 def test_build_srt_strips_null_bytes():
     assert "hi there" in build_srt([{"start": 0, "end": 1, "text": "hi\x00 there"}])
+
+
+def test_timestamp_rejects_overflow_when_converting_to_milliseconds():
+    with pytest.raises(ValueError, match="supported range"):
+        srt_timestamp(1e308)
+
+
+@pytest.mark.parametrize("field", ["start", "end"])
+def test_build_srt_rejects_boolean_timestamps(field):
+    segment = {"start": 0, "end": 2, "text": "hello"}
+    segment[field] = True
+    with pytest.raises(ValueError, match="finite nonnegative"):
+        build_srt([segment])
+
+
+def test_build_srt_rejects_oversized_timestamps():
+    with pytest.raises(ValueError, match="supported range"):
+        build_srt([{"start": 0, "end": 1e308, "text": "hello"}])

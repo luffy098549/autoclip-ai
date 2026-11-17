@@ -41,13 +41,24 @@ def select_candidates(candidates: list[Candidate], *, threshold: float = 75.0,
         duration = candidate.end - candidate.start
         if not math.isfinite(duration) or duration < 0.001:
             continue
+        # FFmpeg/subtitle boundaries are millisecond-based. A positive float
+        # interval can still collapse after conversion to integer milliseconds.
+        try:
+            start_ms = int(candidate.start * 1000)
+            end_ms = int(candidate.end * 1000)
+        except (OverflowError, ValueError):
+            continue
+        if end_ms <= start_ms:
+            continue
         if not 0 <= candidate.score <= 100 or candidate.score < threshold:
             continue
         overlap = False
         for existing in selected:
-            shared = max(0.0, min(candidate.end, existing.end) - max(candidate.start, existing.start))
-            shorter = min(candidate.end - candidate.start, existing.end - existing.start)
-            if shorter <= 0 or not math.isfinite(shorter) or shared / shorter > max_overlap_ratio:
+            existing_start_ms = int(existing.start * 1000)
+            existing_end_ms = int(existing.end * 1000)
+            shared = max(0, min(end_ms, existing_end_ms) - max(start_ms, existing_start_ms))
+            shorter = min(end_ms - start_ms, existing_end_ms - existing_start_ms)
+            if shorter <= 0 or shared / shorter > max_overlap_ratio:
                 overlap = True
                 break
         if not overlap:

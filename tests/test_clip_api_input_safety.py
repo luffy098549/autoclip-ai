@@ -99,3 +99,22 @@ def test_subtitle_download_is_private_and_no_store(portal):
     response = client.get(f"/api/clips/{clip_id}/subtitles")
     assert response.status_code == 200
     assert response.headers["Cache-Control"] == "private, no-store"
+
+
+def test_transcript_denies_source_when_rights_revoked(portal):
+    app, client, source_id, _ = portal
+    with app.app_context():
+        source = db.session.get(MediaSource, source_id)
+        source.rights_status = "unverified"
+        source.permission_evidence = ""
+        db.session.commit()
+    response = client.get(f"/api/sources/{source_id}/transcript")
+    assert response.status_code == 403
+    assert "segments" not in response.json
+
+
+def test_transcript_allows_owned_source(portal):
+    _, client, source_id, _ = portal
+    response = client.get(f"/api/sources/{source_id}/transcript")
+    assert response.status_code == 200
+    assert response.json["segments"] == []

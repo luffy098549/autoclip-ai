@@ -32,7 +32,11 @@ def transcribe_file(path: str, *, model_size: str | None = None,
             continue
         if not (math.isfinite(start) and math.isfinite(end) and 0 <= start < end):
             continue
-        start_ms, end_ms = round(start * 1000), round(end * 1000)
+        # Very large finite seconds may overflow when converted to milliseconds.
+        scaled_start, scaled_end = start * 1000, end * 1000
+        if not (math.isfinite(scaled_start) and math.isfinite(scaled_end)):
+            continue
+        start_ms, end_ms = round(scaled_start), round(scaled_end)
         if end_ms <= start_ms:
             continue
         text = str(seg.text).replace("\x00", "").strip()

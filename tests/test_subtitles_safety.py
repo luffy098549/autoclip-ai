@@ -59,7 +59,7 @@ def test_build_srt_rejects_cues_collapsed_by_millisecond_rounding(start, end):
 
 
 def test_build_srt_flattens_embedded_blank_lines_and_control_whitespace():
-    result = build_srt([{"start": 0, "end": 2, "text": "hello\\n\\n2\\n00:00:00,000 --> 00:00:01,000\\tworld"}])
+    result = build_srt([{"start": 0, "end": 2, "text": "hello\n\n2\n00:00:00,000 --> 00:00:01,000\tworld"}])
     assert result.count(" --> ") == 1
-    assert result.count("\\n\\n") == 0
+    assert result.count("\n\n") == 0
     assert "hello 2 00:00:00,000 --> 00:00:01,000 world" in result

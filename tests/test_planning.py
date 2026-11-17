@@ -196,3 +196,31 @@ def test_reschedule_requires_admin_and_pending_draft(portal):
     assert client.post(f"/api/plans/{pid}/reschedule", json={
         "scheduled_local": "2099-10-05T14:00",
     }).status_code == 409
+
+
+def test_cancel_requires_admin_and_existing_draft(portal):
+    client, cid = portal
+    assert client.post("/api/plans/1/cancel").status_code == 401
+    sign_in(client)
+    assert client.post("/api/plans/999/cancel").status_code == 404
+    created = plan(client, cid)
+    assert created.status_code == 201
+    pid = created.json["item"]["id"]
+    response = client.post(f"/api/plans/{pid}/cancel")
+    assert response.status_code == 200
+    assert response.json["item"]["state"] == "canceled"
+    assert client.post(f"/api/plans/{pid}/cancel").status_code == 409
+    assert plan(client, cid).status_code == 201
+
+
+def test_cancel_rejects_unknown_platform_without_mutating_state(portal):
+    client, cid = portal
+    sign_in(client)
+    pid = plan(client, cid).json["item"]["id"]
+    with client.application.app_context():
+        item = db.session.get(Publication, pid)
+        item.platform = "unsupported"
+        db.session.commit()
+    assert client.post(f"/api/plans/{pid}/cancel").status_code == 400
+    with client.application.app_context():
+        assert db.session.get(Publication, pid).state == "planned"

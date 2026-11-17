@@ -39,7 +39,8 @@ def select_candidates(candidates: list[Candidate], *, threshold: float = 75.0,
         # Reject windows that cannot be represented as a positive millisecond
         # duration or whose subtraction overflows to infinity.
         duration = candidate.end - candidate.start
-        # Bound clips to a day: enormous finite values otherwise become\n        # unbounded millisecond integers and unusable FFmpeg clip requests.\n        if not math.isfinite(duration) or not 0.001 <= duration <= 86400:
+        # Bound clips to a day: enormous finite values otherwise become\n        # unbounded millisecond integers and unusable FFmpeg clip requests.
+        if not math.isfinite(duration) or not 0.001 <= duration <= 86400:
             continue
         # FFmpeg/subtitle boundaries are millisecond-based. A positive float
         # interval can still collapse after conversion to integer milliseconds.

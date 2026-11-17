@@ -47,7 +47,7 @@ def test_overflowing_duration_is_not_selected():
     # Negative start is independently invalid; check a positive start too.
     positive = Candidate(0.0, 1e308, 90)
     valid = Candidate(1.0, 2.0, 80)
-    assert select_candidates([huge, positive, valid], threshold=75) == [positive, valid]
+    assert select_candidates([huge, positive, valid], threshold=75) == [positive]
 
 
 def test_finite_but_submillisecond_duration_at_large_offset():

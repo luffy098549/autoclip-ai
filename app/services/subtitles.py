@@ -12,7 +12,10 @@ def srt_timestamp(seconds: float) -> str:
         raise ValueError("Timestamp must be a finite nonnegative number") from None
     if not math.isfinite(value) or value < 0:
         raise ValueError("Timestamp must be a finite nonnegative number")
-    millis = round(value * 1000)
+    scaled = value * 1000
+    if not math.isfinite(scaled):
+        raise ValueError("Timestamp exceeds supported range")
+    millis = round(scaled)
     hours, remainder = divmod(millis, 3600000)
     minutes, remainder = divmod(remainder, 60000)
     whole_seconds, ms = divmod(remainder, 1000)
@@ -23,10 +26,10 @@ def build_srt(segments: list[dict]) -> str:
     """Produce sequentially numbered cues, rejecting invalid timing and unsafe text."""
     blocks = []
     for segment in segments:
+        start_stamp = srt_timestamp(segment["start"])
+        end_stamp = srt_timestamp(segment["end"])
         start = float(segment["start"])
         end = float(segment["end"])
-        start_stamp = srt_timestamp(start)
-        end_stamp = srt_timestamp(end)
         if end <= start:
             raise ValueError("Subtitle end must follow its start")
         text = str(segment["text"]).strip().replace("\r", " ").replace("\x00", "")

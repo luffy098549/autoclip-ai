@@ -36,13 +36,18 @@ def select_candidates(candidates: list[Candidate], *, threshold: float = 75.0,
     for candidate in sorted(valid, key=lambda x: (-x.score, x.start, x.end)):
         if candidate.start < 0 or candidate.end <= candidate.start:
             continue
+        # Reject windows that cannot be represented as a positive millisecond
+        # duration or whose subtraction overflows to infinity.
+        duration = candidate.end - candidate.start
+        if not math.isfinite(duration) or duration < 0.001:
+            continue
         if not 0 <= candidate.score <= 100 or candidate.score < threshold:
             continue
         overlap = False
         for existing in selected:
             shared = max(0.0, min(candidate.end, existing.end) - max(candidate.start, existing.start))
             shorter = min(candidate.end - candidate.start, existing.end - existing.start)
-            if shared / shorter > max_overlap_ratio:
+            if shorter <= 0 or not math.isfinite(shorter) or shared / shorter > max_overlap_ratio:
                 overlap = True
                 break
         if not overlap:

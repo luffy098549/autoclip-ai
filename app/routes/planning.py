@@ -4,7 +4,7 @@ from pathlib import Path
 from uuid import uuid4
 import re
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 from sqlalchemy import text
 
 from ..models import db, Clip, MediaSource, Publication
@@ -93,9 +93,14 @@ def plans():
         ).allowed:
             db.session.rollback()
             return jsonify(error="No hay derechos de uso confirmados"), 403
-        if not Path(clip.output_path).is_file():
+        # Only schedule rendered MP4s under the managed clips directory.
+        # Resolving both paths also rejects symlinks escaping MEDIA_ROOT.
+        clips_directory = (Path(current_app.config["MEDIA_ROOT"]) / "clips").resolve()
+        video = Path(clip.output_path).resolve()
+        if (video.parent != clips_directory or video.suffix.lower() != ".mp4"
+                or not video.is_file()):
             db.session.rollback()
-            return jsonify(error="No se encuentra el video exportado"), 400
+            return jsonify(error="No se encuentra un video exportado válido"), 400
         existing = Publication.query.filter(
             Publication.platform == platform, Publication.state.in_(ACTIVE_STATES)
         ).all()

@@ -50,3 +50,16 @@ def test_build_srt_rejects_boolean_timestamps(field):
 def test_build_srt_rejects_oversized_timestamps():
     with pytest.raises(ValueError, match="supported range"):
         build_srt([{"start": 0, "end": 1e308, "text": "hello"}])
+
+
+@pytest.mark.parametrize("start,end", [(0, 0.0001), (1.0001, 1.0002)])
+def test_build_srt_rejects_cues_collapsed_by_millisecond_rounding(start, end):
+    with pytest.raises(ValueError, match="millisecond precision"):
+        build_srt([{"start": start, "end": end, "text": "tiny"}])
+
+
+def test_build_srt_flattens_embedded_blank_lines_and_control_whitespace():
+    result = build_srt([{"start": 0, "end": 2, "text": "hello\\n\\n2\\n00:00:00,000 --> 00:00:01,000\\tworld"}])
+    assert result.count(" --> ") == 1
+    assert result.count("\\n\\n") == 0
+    assert "hello 2 00:00:00,000 --> 00:00:01,000 world" in result

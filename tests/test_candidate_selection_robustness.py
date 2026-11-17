@@ -53,3 +53,19 @@ def test_overflowing_duration_is_not_selected():
 def test_finite_but_submillisecond_duration_at_large_offset():
     tiny = Candidate(1000.0, 1000.0001, 99)
     assert select_candidates([tiny]) == []
+
+
+def test_submillisecond_positive_window_collapses_after_quantization():
+    # 1.0001..1.0010 seconds is positive, but both ends truncate to 1000 ms.
+    collapsed = Candidate(1.0001, 1.0009, 100)
+    valid = Candidate(2.0, 3.0, 80)
+    assert select_candidates([collapsed, valid]) == [valid]
+
+
+def test_overlap_uses_rendered_millisecond_boundaries():
+    # Floating-point windows barely overlap, but millisecond truncation
+    # makes the first two share the same 1 ms of rendered media.
+    first = Candidate(0.0001, 0.0019, 99)
+    second = Candidate(0.0011, 0.0029, 98)
+    third = Candidate(0.0031, 0.0049, 80)
+    assert select_candidates([first, second, third], max_overlap_ratio=0) == [first, third]

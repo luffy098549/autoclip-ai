@@ -27,6 +27,8 @@ def transcribe_file(path: str, *, model_size: str | None = None,
     for seg in segments:
         # Reject malformed and sub-millisecond cues before storing metadata.
         try:
+            if isinstance(seg.start, bool) or isinstance(seg.end, bool):
+                continue
             start, end = float(seg.start), float(seg.end)
         except (TypeError, ValueError, OverflowError):
             continue

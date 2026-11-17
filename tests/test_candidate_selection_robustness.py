@@ -55,11 +55,10 @@ def test_finite_but_submillisecond_duration_at_large_offset():
     assert select_candidates([tiny]) == []
 
 
-def test_submillisecond_positive_window_collapses_after_quantization():
-    # 1.0001..1.0010 seconds is positive, but both ends truncate to 1000 ms.
-    collapsed = Candidate(1.0001, 1.0009, 100)
-    valid = Candidate(2.0, 3.0, 80)
-    assert select_candidates([collapsed, valid]) == [valid]
+def test_adjacent_rendered_windows_are_not_deduplicated():
+    first = Candidate(1.0001, 1.0021, 99)
+    second = Candidate(1.0021, 1.0041, 98)
+    assert select_candidates([first, second], max_overlap_ratio=0) == [first, second]
 
 
 def test_overlap_uses_rendered_millisecond_boundaries():

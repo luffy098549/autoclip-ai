@@ -128,14 +128,28 @@ def plans():
 @planning_bp.post("/plans/<int:plan_id>/cancel")
 @admin_only
 def cancel_plan(plan_id):
-    item = db.session.get(Publication, plan_id)
-    if item is None:
-        return jsonify(error="Plan no encontrado"), 404
-    if item.state != "planned":
-        return jsonify(error="Solo se pueden cancelar borradores pendientes"), 409
-    item.state = "canceled"
-    db.session.commit()
-    return jsonify(item=_serialize(item), message="Borrador cancelado")
+    """Cancel a draft under the same platform lock used by rescheduling."""
+    try:
+        item = db.session.get(Publication, plan_id)
+        if item is None:
+            return jsonify(error="Plan no encontrado"), 404
+        if item.platform not in PLATFORMS:
+            return jsonify(error="Plataforma no válida"), 400
+        if db.engine.dialect.name == "postgresql":
+            lock_keys = {"youtube": 100091, "tiktok": 100092, "instagram": 100093}
+            db.session.execute(
+                text("SELECT pg_advisory_xact_lock(:key)"),
+                {"key": lock_keys[item.platform]},
+            )
+            db.session.refresh(item)
+        if item.state != "planned":
+            return jsonify(error="Solo se pueden cancelar borradores pendientes"), 409
+        item.state = "canceled"
+        db.session.commit()
+        return jsonify(item=_serialize(item), message="Borrador cancelado")
+    except Exception:
+        db.session.rollback()
+        raise
 
 
 @planning_bp.post("/plans/<int:plan_id>/reschedule")

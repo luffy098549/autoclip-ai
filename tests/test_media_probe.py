@@ -41,3 +41,54 @@ def test_real_synthetic_video(tmp_path):
     assert metadata["height"] == 180
     assert metadata["duration_seconds"] > 0
     assert metadata["has_audio"] is False
+
+
+@pytest.mark.parametrize("payload", [
+    "not json",
+    "[]",
+    '{"streams": "invalid", "format": {"duration": "2"}}',
+    '{"streams": [{"codec_type": "video", "width": true, "height": 180}], "format": {"duration": "2"}}',
+    '{"streams": [{"codec_type": "video", "width": 320, "height": 180}], "format": {"duration": "not-a-number"}}',
+])
+def test_reject_malformed_probe_data(tmp_path, payload):
+    source = tmp_path / "malformed.mp4"
+    source.write_bytes(b"fixture")
+    with patch("app.media_probe.subprocess.run") as run:
+        run.return_value.stdout = payload
+        with pytest.raises(ValueError):
+            inspect_local_video(source)
+
+
+def test_reject_cover_art_as_video(tmp_path):
+    source = tmp_path / "cover.mp4"
+    source.write_bytes(b"fixture")
+    with patch("app.media_probe.subprocess.run") as run:
+        run.return_value.stdout = json.dumps({
+            "streams": [
+                {"codec_type": "video", "width": 600, "height": 600,
+                 "disposition": {"attached_pic": 1}},
+                {"codec_type": "audio"},
+            ],
+            "format": {"duration": "30"},
+        })
+        with pytest.raises(ValueError, match="no video"):
+            inspect_local_video(source)
+
+
+def test_choose_actual_video_over_cover_art(tmp_path):
+    source = tmp_path / "video.mp4"
+    source.write_bytes(b"fixture")
+    with patch("app.media_probe.subprocess.run") as run:
+        run.return_value.stdout = json.dumps({
+            "streams": [
+                {"codec_type": "video", "width": 600, "height": 600,
+                 "disposition": {"attached_pic": 1}},
+                {"codec_type": "video", "width": 1920, "height": 1080},
+                {"codec_type": "audio"},
+            ],
+            "format": {"duration": "30"},
+        })
+        result = inspect_local_video(source)
+        assert result["width"] == 1920
+        assert result["height"] == 1080
+        assert result["has_audio"] is True

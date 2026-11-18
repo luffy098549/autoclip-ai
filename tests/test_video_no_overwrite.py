@@ -81,3 +81,34 @@ def test_reject_dangling_symlink_output(tmp_path, monkeypatch):
     monkeypatch.setattr(video.subprocess, "run", lambda *a, **kw: pytest.fail("Unexpected FFmpeg"))
     with pytest.raises(FileExistsError):
         video.render_vertical_clip(source, alias, 0, 2)
+
+
+@pytest.mark.parametrize("start,end,expected", [
+    (0, 2, 120),
+    (0, 20, 600),
+    (0, 500, 3600),
+])
+def test_export_has_bounded_timeout(tmp_path, monkeypatch, start, end, expected):
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"authorized fixture")
+    seen = []
+
+    def fake_run(command, **kwargs):
+        seen.append(kwargs["timeout"])
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(video.subprocess, "run", fake_run)
+    video.render_vertical_clip(source, tmp_path / "out.mp4", start, end)
+    assert seen == [expected]
+
+
+def test_ffmpeg_timeout_propagates_to_cleanup_caller(tmp_path, monkeypatch):
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"authorized fixture")
+
+    def timeout(command, **kwargs):
+        raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+
+    monkeypatch.setattr(video.subprocess, "run", timeout)
+    with pytest.raises(subprocess.TimeoutExpired):
+        video.render_vertical_clip(source, tmp_path / "out.mp4", 0, 3)

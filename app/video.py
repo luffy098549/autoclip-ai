@@ -12,11 +12,11 @@ def render_vertical_clip(input_file, output_file, start_sec, end_sec):
         raise ValueError("Invalid timestamps")
     target.parent.mkdir(parents=True, exist_ok=True)
     command = [
-        "ffmpeg", "-hide_banner", "-y", "-ss", str(start_sec),
+        "ffmpeg", "-hide_banner", "-n", "-ss", str(start_sec),
         "-i", str(source), "-t", str(end_sec - start_sec),
         "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
         "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(target),
     ]
-    subprocess.run(command, check=True)
+    # -n prevents a concurrent export from being silently overwritten.\n    subprocess.run(command, check=True)
     return str(target)

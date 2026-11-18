@@ -12,17 +12,32 @@ def inspect_local_video(path):
         raise FileNotFoundError(source)
     result = subprocess.run(
         ["ffprobe", "-v", "error", "-show_entries",
-         "format=duration:stream=codec_type,width,height", "-of", "json", str(source)],
+         "format=duration:stream=codec_type,width,height,disposition",
+         "-of", "json", str(source)],
         check=True, capture_output=True, text=True, timeout=30,
+        stdin=subprocess.DEVNULL,
     )
-    data = json.loads(result.stdout)
-    videos = [s for s in data.get("streams", []) if s.get("codec_type") == "video"]
-    if not videos:
-        raise ValueError("Media has no video stream")
-    duration = float(data.get("format", {}).get("duration", 0))
-    width = videos[0].get("width")
-    height = videos[0].get("height")
-    if not math.isfinite(duration) or duration <= 0 or not isinstance(width, int) or not isinstance(height, int) or width <= 0 or height <= 0:
-        raise ValueError("Invalid video metadata")
+    try:
+        data = json.loads(result.stdout)
+        if not isinstance(data, dict):
+            raise ValueError("Invalid video metadata")
+        streams = data.get("streams", [])
+        if not isinstance(streams, list):
+            raise ValueError("Invalid video metadata")
+        videos = [s for s in streams if isinstance(s, dict)
+                  and s.get("codec_type") == "video"
+                  and not s.get("disposition", {}).get("attached_pic", 0)]
+        if not videos:
+            raise ValueError("Media has no video stream")
+        duration = float(data.get("format", {}).get("duration", 0))
+        width = videos[0].get("width")
+        height = videos[0].get("height")
+        if (not math.isfinite(duration) or duration <= 0
+                or type(width) is not int or type(height) is not int
+                or width <= 0 or height <= 0):
+            raise ValueError("Invalid video metadata")
+    except (TypeError, KeyError, OverflowError, json.JSONDecodeError) as exc:
+        raise ValueError("Invalid video metadata") from exc
     return {"duration_seconds": duration, "width": width, "height": height,
-            "has_audio": any(s.get("codec_type") == "audio" for s in data.get("streams", []))}
+            "has_audio": any(isinstance(s, dict) and s.get("codec_type") == "audio"
+                             for s in streams)}

@@ -79,3 +79,17 @@ def test_existing_export_never_overwritten_or_deleted(tmp_path, monkeypatch, vid
         pipeline.create_local_clip("owned.mp4", target,
                                    start=0, end=5, authorized=True)
     assert target.read_bytes() == b"keep me"
+
+
+def test_dangling_symlink_export_is_preserved(tmp_path, monkeypatch, video_stubs):
+    target = tmp_path / "clip.mp4"
+    missing = tmp_path / "not-created.mp4"
+    target.symlink_to(missing)
+    monkeypatch.setattr(pipeline, "inspect_video",
+                        lambda _: pytest.fail("probe must not run for existing symlink"))
+    with pytest.raises(FileExistsError):
+        pipeline.create_local_clip("owned.mp4", target,
+                                   start=0, end=5, authorized=True)
+    assert target.is_symlink()
+    assert not missing.exists()
+    assert video_stubs == []

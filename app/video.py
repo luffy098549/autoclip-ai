@@ -28,5 +28,7 @@ def render_vertical_clip(input_file, output_file, start_sec, end_sec):
         "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(target),
     ]
     # -n prevents a concurrent export from being silently overwritten.
-    # Bound stalled encodes; caller removes partial output on failure.\n    timeout_seconds = max(120, min(3600, int((end_sec - start_sec) * 30)))\n    subprocess.run(command, check=True, timeout=timeout_seconds)
+    # Bound stalled encodes; caller removes partial output on failure.
+    timeout_seconds = max(120, min(3600, int((end_sec - start_sec) * 30)))
+    subprocess.run(command, check=True, timeout=timeout_seconds)
     return str(target)

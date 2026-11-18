@@ -234,7 +234,6 @@ def test_concurrent_destination_is_never_deleted(tmp_path, monkeypatch):
     def competing_worker(command, **kwargs):
         Path(command[-1]).write_bytes(b"encoded")
         destination.write_bytes(b"other worker")
-        Path(command[-1]).write_bytes(b"encoded fixture")
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(video.subprocess, "run", competing_worker)
@@ -252,7 +251,6 @@ def test_successful_export_publishes_and_cleans_temp(tmp_path, monkeypatch):
 
     def encoder(command, **kwargs):
         Path(command[-1]).write_bytes(b"encoded")
-        Path(command[-1]).write_bytes(b"encoded fixture")
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(video.subprocess, "run", encoder)
@@ -274,4 +272,38 @@ def test_empty_successful_encoder_output_is_rejected(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match="empty output"):
         video.render_vertical_clip(source, destination, 0, 2)
     assert not destination.exists()
+    assert not list(tmp_path.glob(".autoclip-*.mp4"))
+
+
+def test_export_does_not_overwrite_destination_created_during_encode(tmp_path, monkeypatch):
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"authorized")
+    destination = tmp_path / "clip.mp4"
+
+    def encode(command, **kwargs):
+        Path(command[-1]).write_bytes(b"new clip")
+        destination.write_bytes(b"preexisting result")
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(video.subprocess, "run", encode)
+    with pytest.raises(FileExistsError):
+        video.render_vertical_clip(source, destination, 0, 2)
+    assert destination.read_bytes() == b"preexisting result"
+    assert not list(tmp_path.glob(".autoclip-*.mp4"))
+
+
+def test_encoder_failure_cleans_temp_without_touching_existing_destination(tmp_path, monkeypatch):
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"authorized")
+    destination = tmp_path / "clip.mp4"
+
+    def encode(command, **kwargs):
+        Path(command[-1]).write_bytes(b"partial")
+        destination.write_bytes(b"concurrent result")
+        raise subprocess.CalledProcessError(1, command)
+
+    monkeypatch.setattr(video.subprocess, "run", encode)
+    with pytest.raises(subprocess.CalledProcessError):
+        video.render_vertical_clip(source, destination, 0, 2)
+    assert destination.read_bytes() == b"concurrent result"
     assert not list(tmp_path.glob(".autoclip-*.mp4"))

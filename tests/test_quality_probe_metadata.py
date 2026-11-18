@@ -137,3 +137,33 @@ def test_invalid_container_duration_uses_valid_stream_duration(tmp_path, monkeyp
     monkeypatch.setattr(quality.subprocess, "run", lambda *a, **kw:
                         subprocess.CompletedProcess(a[0], 0, stdout=json.dumps(payload)))
     assert quality.inspect_video(source)["duration"] == 9.5
+
+
+@pytest.mark.parametrize("container_duration", ["bad-value", {}, [], "", "  ", True])
+def test_malformed_container_duration_recovers_from_stream(tmp_path, monkeypatch, container_duration):
+    source = tmp_path / "owned.mp4"
+    source.write_bytes(b"fixture")
+    monkeypatch.setattr(quality.shutil, "which", lambda name: "/usr/bin/ffprobe")
+    payload = {
+        "format": {"duration": container_duration},
+        "streams": [
+            {"codec_type": "video", "width": 1080, "height": 1920, "duration": "11.25"},
+            {"codec_type": "audio"},
+        ],
+    }
+    monkeypatch.setattr(quality.subprocess, "run", lambda *a, **kw:
+                        subprocess.CompletedProcess(a[0], 0, stdout=json.dumps(payload)))
+    assert quality.inspect_video(source)["duration"] == 11.25
+
+
+def test_invalid_container_and_stream_durations_are_rejected(tmp_path, monkeypatch):
+    source = tmp_path / "owned.mp4"
+    source.write_bytes(b"fixture")
+    monkeypatch.setattr(quality.shutil, "which", lambda name: "/usr/bin/ffprobe")
+    payload = {"format": {"duration": "broken"}, "streams": [
+        {"codec_type": "video", "width": 1080, "height": 1920, "duration": "also-broken"}
+    ]}
+    monkeypatch.setattr(quality.subprocess, "run", lambda *a, **kw:
+                        subprocess.CompletedProcess(a[0], 0, stdout=json.dumps(payload)))
+    with pytest.raises(quality.MediaValidationError, match="positive duration"):
+        quality.inspect_video(source)

@@ -72,3 +72,51 @@ def test_malformed_ffprobe_report_is_media_error(tmp_path, monkeypatch, payload)
     )
     with pytest.raises(quality.MediaValidationError):
         quality.inspect_video(source)
+
+
+def test_stream_duration_fallback_for_valid_container(tmp_path, monkeypatch):
+    source = tmp_path / "owned.mp4"
+    source.write_bytes(b"fixture")
+    monkeypatch.setattr(quality.shutil, "which", lambda name: "/usr/bin/ffprobe")
+    payload = {
+        "format": {},
+        "streams": [
+            {"codec_type": "video", "width": 1080, "height": 1920, "duration": "8.25"},
+            {"codec_type": "audio"},
+        ],
+    }
+    monkeypatch.setattr(quality.subprocess, "run", lambda *a, **kw:
+                        subprocess.CompletedProcess(a[0], 0, stdout=json.dumps(payload)))
+    assert quality.inspect_video(source)["duration"] == 8.25
+
+
+def test_cover_art_does_not_replace_real_video_stream(tmp_path, monkeypatch):
+    source = tmp_path / "owned.mp4"
+    source.write_bytes(b"fixture")
+    monkeypatch.setattr(quality.shutil, "which", lambda name: "/usr/bin/ffprobe")
+    payload = {
+        "format": {"duration": "7"},
+        "streams": [
+            {"codec_type": "video", "width": 500, "height": 500,
+             "disposition": {"attached_pic": 1}},
+            {"codec_type": "video", "width": 1080, "height": 1920},
+            {"codec_type": "audio"},
+        ],
+    }
+    monkeypatch.setattr(quality.subprocess, "run", lambda *a, **kw:
+                        subprocess.CompletedProcess(a[0], 0, stdout=json.dumps(payload)))
+    assert quality.validate_render(source)["width"] == 1080
+
+
+def test_cover_art_alone_is_not_video(tmp_path, monkeypatch):
+    source = tmp_path / "owned.mp4"
+    source.write_bytes(b"fixture")
+    monkeypatch.setattr(quality.shutil, "which", lambda name: "/usr/bin/ffprobe")
+    payload = {"format": {"duration": "7"}, "streams": [
+        {"codec_type": "video", "width": 500, "height": 500,
+         "disposition": {"attached_pic": 1}},
+    ]}
+    monkeypatch.setattr(quality.subprocess, "run", lambda *a, **kw:
+                        subprocess.CompletedProcess(a[0], 0, stdout=json.dumps(payload)))
+    with pytest.raises(quality.MediaValidationError, match="No video stream"):
+        quality.inspect_video(source)

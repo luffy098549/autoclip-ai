@@ -46,7 +46,11 @@ def inspect_video(path):
     if not isinstance(fmt, dict):
         raise MediaValidationError("Invalid ffprobe format")
     try:
-        duration = float(fmt.get("duration") or video.get("duration") or 0)
+        container_duration = fmt.get("duration")
+        stream_duration = video.get("duration")
+        duration = float(container_duration) if container_duration not in (None, "", "N/A") else 0.0
+        if not math.isfinite(duration) or duration <= 0:
+            duration = float(stream_duration) if stream_duration not in (None, "", "N/A") else 0.0
         width = int(video.get("width") or 0)
         height = int(video.get("height") or 0)
     except (TypeError, ValueError, OverflowError) as exc:

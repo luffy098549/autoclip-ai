@@ -48,9 +48,14 @@ def inspect_video(path):
     try:
         container_duration = fmt.get("duration")
         stream_duration = video.get("duration")
-        duration = float(container_duration) if container_duration not in (None, "", "N/A") else 0.0
-        if not math.isfinite(duration) or duration <= 0:
-            duration = float(stream_duration) if stream_duration not in (None, "", "N/A") else 0.0
+        def positive_duration(value):
+            try:
+                number = float(value)
+            except (TypeError, ValueError, OverflowError):
+                return 0.0
+            return number if math.isfinite(number) and number > 0 else 0.0
+
+        duration = positive_duration(container_duration) or positive_duration(stream_duration)
         width = int(video.get("width") or 0)
         height = int(video.get("height") or 0)
     except (TypeError, ValueError, OverflowError) as exc:

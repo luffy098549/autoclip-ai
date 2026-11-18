@@ -1,5 +1,7 @@
 """Local, authorized input only. Requires ffmpeg on PATH."""
 import math
+import os
+import tempfile
 import subprocess
 from pathlib import Path
 
@@ -19,29 +21,27 @@ def render_vertical_clip(input_file, output_file, start_sec, end_sec):
         raise ValueError("Input and output must be different files")
     if target.exists() or target.is_symlink():
         raise FileExistsError("Output already exists")
-    if target.exists() or target.is_symlink():
-        raise FileExistsError("Output already exists")
     target.parent.mkdir(parents=True, exist_ok=True)
+    # Each export owns its temporary file. Publish via hard link only after success.
+    fd, temporary_name = tempfile.mkstemp(prefix=".autoclip-", suffix=".mp4", dir=target.parent)
+    os.close(fd)
+    temporary = Path(temporary_name)
     command = [
-        "ffmpeg", "-hide_banner", "-nostdin", "-n", "-ss", str(start_sec),
+        "ffmpeg", "-hide_banner", "-nostdin", "-y", "-ss", str(start_sec),
         "-i", str(source), "-t", str(end_sec - start_sec),
         "-map", "0:V:0", "-map", "0:a:0?",
         "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "128k", "-ar", "48000",
-        "-movflags", "+faststart", str(target),
+        "-movflags", "+faststart", str(temporary),
     ]
-    # -n prevents a concurrent export from being silently overwritten.
-    # Bound stalled encodes; caller removes partial output on failure.
+    # Bound stalled encodes; temporary output is always removed on failure.
     timeout_seconds = max(120, min(3600, int(min(end_sec - start_sec, 120) * 30)))
     try:
         subprocess.run(command, check=True, timeout=timeout_seconds)
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
-        # A failed encoder may leave a truncated output. Do not mistake it for a clip.
-        # Only remove files created after our preflight; callers must serialize
-        # exports targeting the same destination to avoid cross-job races.
-        if target.is_file() and not target.is_symlink():
-            target.unlink()
-        raise
+        # os.link fails if another worker has already published this name.
+        os.link(temporary, target)
+    finally:
+        temporary.unlink(missing_ok=True)
     return str(target)

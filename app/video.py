@@ -40,6 +40,9 @@ def render_vertical_clip(input_file, output_file, start_sec, end_sec):
     timeout_seconds = max(120, min(3600, int(min(end_sec - start_sec, 120) * 30)))
     try:
         subprocess.run(command, check=True, timeout=timeout_seconds)
+        # A zero-byte output is never a valid export, even when FFmpeg exits 0.
+        if temporary.stat().st_size == 0:
+            raise RuntimeError("FFmpeg produced an empty output")
         # os.link fails if another worker has already published this name.
         os.link(temporary, target)
     finally:

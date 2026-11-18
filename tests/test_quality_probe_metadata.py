@@ -120,3 +120,20 @@ def test_cover_art_alone_is_not_video(tmp_path, monkeypatch):
                         subprocess.CompletedProcess(a[0], 0, stdout=json.dumps(payload)))
     with pytest.raises(quality.MediaValidationError, match="No video stream"):
         quality.inspect_video(source)
+
+
+@pytest.mark.parametrize("container_duration", ["N/A", "0", "-1", "NaN", "Infinity", None])
+def test_invalid_container_duration_uses_valid_stream_duration(tmp_path, monkeypatch, container_duration):
+    source = tmp_path / "owned.mp4"
+    source.write_bytes(b"fixture")
+    monkeypatch.setattr(quality.shutil, "which", lambda name: "/usr/bin/ffprobe")
+    payload = {
+        "format": {"duration": container_duration},
+        "streams": [
+            {"codec_type": "video", "width": 1080, "height": 1920, "duration": "9.5"},
+            {"codec_type": "audio"},
+        ],
+    }
+    monkeypatch.setattr(quality.subprocess, "run", lambda *a, **kw:
+                        subprocess.CompletedProcess(a[0], 0, stdout=json.dumps(payload)))
+    assert quality.inspect_video(source)["duration"] == 9.5

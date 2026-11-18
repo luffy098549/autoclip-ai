@@ -18,5 +18,6 @@ def render_vertical_clip(input_file, output_file, start_sec, end_sec):
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
         "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(target),
     ]
-    # -n prevents a concurrent export from being silently overwritten.\n    subprocess.run(command, check=True)
+    # -n prevents a concurrent export from being silently overwritten.
+    subprocess.run(command, check=True)
     return str(target)

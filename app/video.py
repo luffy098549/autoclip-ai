@@ -26,7 +26,9 @@ def render_vertical_clip(input_file, output_file, start_sec, end_sec):
         "-map", "0:v:0", "-map", "0:a:0?",
         "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-        "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(target),
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-b:a", "128k", "-ar", "48000",
+        "-movflags", "+faststart", str(target),
     ]
     # -n prevents a concurrent export from being silently overwritten.
     # Bound stalled encodes; caller removes partial output on failure.

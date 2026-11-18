@@ -19,6 +19,8 @@ def render_vertical_clip(input_file, output_file, start_sec, end_sec):
         raise ValueError("Input and output must be different files")
     if target.exists() or target.is_symlink():
         raise FileExistsError("Output already exists")
+    if target.exists() or target.is_symlink():
+        raise FileExistsError("Output already exists")
     target.parent.mkdir(parents=True, exist_ok=True)
     command = [
         "ffmpeg", "-hide_banner", "-nostdin", "-n", "-ss", str(start_sec),
@@ -33,5 +35,13 @@ def render_vertical_clip(input_file, output_file, start_sec, end_sec):
     # -n prevents a concurrent export from being silently overwritten.
     # Bound stalled encodes; caller removes partial output on failure.
     timeout_seconds = max(120, min(3600, int(min(end_sec - start_sec, 120) * 30)))
-    subprocess.run(command, check=True, timeout=timeout_seconds)
+    try:
+        subprocess.run(command, check=True, timeout=timeout_seconds)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        # A failed encoder may leave a truncated output. Do not mistake it for a clip.
+        # Only remove files created after our preflight; callers must serialize
+        # exports targeting the same destination to avoid cross-job races.
+        if target.is_file() and not target.is_symlink():
+            target.unlink()
+        raise
     return str(target)

@@ -23,7 +23,7 @@ def render_vertical_clip(input_file, output_file, start_sec, end_sec):
     command = [
         "ffmpeg", "-hide_banner", "-nostdin", "-n", "-ss", str(start_sec),
         "-i", str(source), "-t", str(end_sec - start_sec),
-        "-map", "0:v:0", "-map", "0:a:0?",
+        "-map", "0:V:0", "-map", "0:a:0?",
         "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
         "-pix_fmt", "yuv420p",
@@ -32,6 +32,6 @@ def render_vertical_clip(input_file, output_file, start_sec, end_sec):
     ]
     # -n prevents a concurrent export from being silently overwritten.
     # Bound stalled encodes; caller removes partial output on failure.
-    timeout_seconds = max(120, min(3600, int((end_sec - start_sec) * 30)))
+    timeout_seconds = max(120, min(3600, int(min(end_sec - start_sec, 120) * 30)))
     subprocess.run(command, check=True, timeout=timeout_seconds)
     return str(target)

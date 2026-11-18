@@ -92,3 +92,21 @@ def test_choose_actual_video_over_cover_art(tmp_path):
         assert result["width"] == 1920
         assert result["height"] == 1080
         assert result["has_audio"] is True
+
+
+@pytest.mark.parametrize("payload", [
+    {"streams": [{"codec_type": "video", "width": 320, "height": 180, "disposition": None}], "format": {"duration": "2"}},
+    {"streams": [{"codec_type": "video", "width": 320, "height": 180}], "format": None},
+    {"streams": [{"codec_type": "video", "width": 320, "height": 180}], "format": {"duration": {}}},
+    {"streams": [{"codec_type": "video", "width": 320, "height": 180, "disposition": "bad"}], "format": {"duration": "2"}},
+])
+def test_probe_handles_unexpected_nested_metadata(tmp_path, payload):
+    source = tmp_path / "nested.mp4"
+    source.write_bytes(b"fixture")
+    with patch("app.media_probe.subprocess.run") as run:
+        run.return_value.stdout = json.dumps(payload)
+        if payload["format"] and payload["streams"][0].get("disposition") is None:
+            assert inspect_local_video(source)["width"] == 320
+        else:
+            with pytest.raises(ValueError, match="Invalid video metadata"):
+                inspect_local_video(source)

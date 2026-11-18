@@ -1,4 +1,5 @@
 """Local, authorized input only. Requires ffmpeg on PATH."""
+import math
 import subprocess
 from pathlib import Path
 
@@ -8,8 +9,16 @@ def render_vertical_clip(input_file, output_file, start_sec, end_sec):
     target = Path(output_file)
     if not source.is_file():
         raise FileNotFoundError(source)
-    if start_sec < 0 or end_sec <= start_sec:
+    if (isinstance(start_sec, bool) or isinstance(end_sec, bool)
+            or not isinstance(start_sec, (int, float))
+            or not isinstance(end_sec, (int, float))
+            or not math.isfinite(start_sec) or not math.isfinite(end_sec)
+            or start_sec < 0 or end_sec <= start_sec):
         raise ValueError("Invalid timestamps")
+    if source.resolve() == target.resolve():
+        raise ValueError("Input and output must be different files")
+    if target.exists() or target.is_symlink():
+        raise FileExistsError("Output already exists")
     target.parent.mkdir(parents=True, exist_ok=True)
     command = [
         "ffmpeg", "-hide_banner", "-n", "-ss", str(start_sec),

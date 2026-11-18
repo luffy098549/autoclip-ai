@@ -49,6 +49,8 @@ def inspect_video(path):
         container_duration = fmt.get("duration")
         stream_duration = video.get("duration")
         def positive_duration(value):
+            if isinstance(value, bool):
+                return 0.0
             try:
                 number = float(value)
             except (TypeError, ValueError, OverflowError):

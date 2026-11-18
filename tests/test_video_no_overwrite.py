@@ -13,8 +13,8 @@ def test_ffmpeg_uses_no_overwrite_mode(tmp_path, monkeypatch):
     def fake_run(command, **kwargs):
         commands.append(command)
         assert kwargs["check"] is True
-        assert "-n" in command
-        assert "-y" not in command
+        assert "-y" in command
+        assert "-n" not in command
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(video.subprocess, "run", fake_run)
@@ -186,7 +186,7 @@ def test_failed_export_removes_partial_file(tmp_path, monkeypatch, failure):
     destination = tmp_path / "clip.mp4"
 
     def failed_encoder(command, **kwargs):
-        destination.write_bytes(b"partial output")
+        __import__("pathlib").Path(command[-1]).write_bytes(b"partial output")
         if failure == "exit":
             raise subprocess.CalledProcessError(1, command)
         raise subprocess.TimeoutExpired(command, kwargs["timeout"])
@@ -196,6 +196,7 @@ def test_failed_export_removes_partial_file(tmp_path, monkeypatch, failure):
     with pytest.raises(expected):
         video.render_vertical_clip(source, destination, 0, 3)
     assert not destination.exists()
+    assert not list(tmp_path.glob(".autoclip-*.mp4"))
 
 
 def test_failed_export_does_not_unlink_symlink(tmp_path, monkeypatch):
@@ -206,6 +207,7 @@ def test_failed_export_does_not_unlink_symlink(tmp_path, monkeypatch):
     protected.write_text("keep")
 
     def failed_encoder(command, **kwargs):
+        __import__("pathlib").Path(command[-1]).write_bytes(b"partial")
         destination.symlink_to(protected)
         raise subprocess.CalledProcessError(1, command)
 
@@ -214,3 +216,37 @@ def test_failed_export_does_not_unlink_symlink(tmp_path, monkeypatch):
         video.render_vertical_clip(source, destination, 0, 3)
     assert destination.is_symlink()
     assert protected.read_text() == "keep"
+
+
+def test_concurrent_destination_is_never_deleted(tmp_path, monkeypatch):
+    from pathlib import Path
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"authorized")
+    destination = tmp_path / "clip.mp4"
+
+    def competing_worker(command, **kwargs):
+        Path(command[-1]).write_bytes(b"encoded")
+        destination.write_bytes(b"other worker")
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(video.subprocess, "run", competing_worker)
+    with pytest.raises(FileExistsError):
+        video.render_vertical_clip(source, destination, 0, 2)
+    assert destination.read_bytes() == b"other worker"
+    assert not list(tmp_path.glob(".autoclip-*.mp4"))
+
+
+def test_successful_export_publishes_and_cleans_temp(tmp_path, monkeypatch):
+    from pathlib import Path
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"authorized")
+    destination = tmp_path / "clip.mp4"
+
+    def encoder(command, **kwargs):
+        Path(command[-1]).write_bytes(b"encoded")
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(video.subprocess, "run", encoder)
+    assert video.render_vertical_clip(source, destination, 0, 2) == str(destination)
+    assert destination.read_bytes() == b"encoded"
+    assert not list(tmp_path.glob(".autoclip-*.mp4"))

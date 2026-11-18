@@ -112,3 +112,21 @@ def test_ffmpeg_timeout_propagates_to_cleanup_caller(tmp_path, monkeypatch):
     monkeypatch.setattr(video.subprocess, "run", timeout)
     with pytest.raises(subprocess.TimeoutExpired):
         video.render_vertical_clip(source, tmp_path / "out.mp4", 0, 3)
+
+
+def test_ffmpeg_noninteractive_and_explicit_stream_selection(tmp_path, monkeypatch):
+    source = tmp_path / "authorized.mp4"
+    source.write_bytes(b"fixture")
+    observed = []
+
+    def fake_run(command, **kwargs):
+        observed.append(command)
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(video.subprocess, "run", fake_run)
+    video.render_vertical_clip(source, tmp_path / "clip.mp4", 0, 2)
+    command = observed[0]
+    assert "-nostdin" in command
+    maps = [command[i + 1] for i, item in enumerate(command[:-1]) if item == "-map"]
+    assert maps == ["0:v:0", "0:a:0?"]
+    assert command.index("-nostdin") < command.index("-i")

@@ -1,5 +1,6 @@
 """FFmpeg export must never silently overwrite another clip."""
 import subprocess
+from pathlib import Path
 import pytest
 from app import video
 
@@ -15,6 +16,7 @@ def test_ffmpeg_uses_no_overwrite_mode(tmp_path, monkeypatch):
         assert kwargs["check"] is True
         assert "-y" in command
         assert "-n" not in command
+        Path(command[-1]).write_bytes(b"encoded fixture")
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(video.subprocess, "run", fake_run)
@@ -95,6 +97,7 @@ def test_export_has_bounded_timeout(tmp_path, monkeypatch, start, end, expected)
 
     def fake_run(command, **kwargs):
         seen.append(kwargs["timeout"])
+        Path(command[-1]).write_bytes(b"encoded fixture")
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(video.subprocess, "run", fake_run)
@@ -121,6 +124,7 @@ def test_ffmpeg_noninteractive_and_explicit_stream_selection(tmp_path, monkeypat
 
     def fake_run(command, **kwargs):
         observed.append(command)
+        Path(command[-1]).write_bytes(b"encoded fixture")
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(video.subprocess, "run", fake_run)
@@ -139,6 +143,7 @@ def test_export_uses_compatible_video_and_audio_formats(tmp_path, monkeypatch):
 
     def fake_run(command, **kwargs):
         captured.append(command)
+        Path(command[-1]).write_bytes(b"encoded fixture")
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(video.subprocess, "run", fake_run)
@@ -157,6 +162,7 @@ def test_timeout_handles_extremely_large_finite_clip_duration(tmp_path, monkeypa
 
     def fake_run(command, **kwargs):
         observed.append(kwargs["timeout"])
+        Path(command[-1]).write_bytes(b"encoded fixture")
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(video.subprocess, "run", fake_run)
@@ -171,6 +177,7 @@ def test_export_ignores_attached_picture_streams(tmp_path, monkeypatch):
 
     def fake_run(command, **kwargs):
         observed.append(command)
+        Path(command[-1]).write_bytes(b"encoded fixture")
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(video.subprocess, "run", fake_run)
@@ -227,6 +234,7 @@ def test_concurrent_destination_is_never_deleted(tmp_path, monkeypatch):
     def competing_worker(command, **kwargs):
         Path(command[-1]).write_bytes(b"encoded")
         destination.write_bytes(b"other worker")
+        Path(command[-1]).write_bytes(b"encoded fixture")
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(video.subprocess, "run", competing_worker)
@@ -244,9 +252,26 @@ def test_successful_export_publishes_and_cleans_temp(tmp_path, monkeypatch):
 
     def encoder(command, **kwargs):
         Path(command[-1]).write_bytes(b"encoded")
+        Path(command[-1]).write_bytes(b"encoded fixture")
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(video.subprocess, "run", encoder)
     assert video.render_vertical_clip(source, destination, 0, 2) == str(destination)
     assert destination.read_bytes() == b"encoded"
+    assert not list(tmp_path.glob(".autoclip-*.mp4"))
+
+
+def test_empty_successful_encoder_output_is_rejected(tmp_path, monkeypatch):
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"authorized")
+    destination = tmp_path / "clip.mp4"
+
+    def empty_encoder(command, **kwargs):
+        assert Path(command[-1]).stat().st_size == 0
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(video.subprocess, "run", empty_encoder)
+    with pytest.raises(RuntimeError, match="empty output"):
+        video.render_vertical_clip(source, destination, 0, 2)
+    assert not destination.exists()
     assert not list(tmp_path.glob(".autoclip-*.mp4"))

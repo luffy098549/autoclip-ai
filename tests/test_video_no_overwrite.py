@@ -130,3 +130,21 @@ def test_ffmpeg_noninteractive_and_explicit_stream_selection(tmp_path, monkeypat
     maps = [command[i + 1] for i, item in enumerate(command[:-1]) if item == "-map"]
     assert maps == ["0:v:0", "0:a:0?"]
     assert command.index("-nostdin") < command.index("-i")
+
+
+def test_export_uses_compatible_video_and_audio_formats(tmp_path, monkeypatch):
+    source = tmp_path / "authorized.mp4"
+    source.write_bytes(b"fixture")
+    captured = []
+
+    def fake_run(command, **kwargs):
+        captured.append(command)
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(video.subprocess, "run", fake_run)
+    video.render_vertical_clip(source, tmp_path / "clip.mp4", 0, 2)
+    command = captured[0]
+    assert command[command.index("-pix_fmt") + 1] == "yuv420p"
+    assert command[command.index("-ar") + 1] == "48000"
+    assert command[command.index("-c:v") + 1] == "libx264"
+    assert command[command.index("-c:a") + 1] == "aac"

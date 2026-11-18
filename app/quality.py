@@ -29,14 +29,14 @@ def inspect_video(path):
     streams = report.get("streams")
     if not isinstance(streams, list) or any(not isinstance(s, dict) for s in streams):
         raise MediaValidationError("Invalid ffprobe streams")
-    video = next((s for s in streams if s.get("codec_type") == "video"), None)
+    video = next((s for s in streams if s.get("codec_type") == "video"\n                  and not (isinstance(s.get("disposition"), dict)\n                           and s["disposition"].get("attached_pic"))), None)
     if video is None:
         raise MediaValidationError("No video stream found")
     fmt = report.get("format")
     if not isinstance(fmt, dict):
         raise MediaValidationError("Invalid ffprobe format")
     try:
-        duration = float(fmt.get("duration") or 0)
+        duration = float(fmt.get("duration") or video.get("duration") or 0)
         width = int(video.get("width") or 0)
         height = int(video.get("height") or 0)
     except (TypeError, ValueError, OverflowError) as exc:

@@ -23,7 +23,7 @@ def create_local_clip(source, destination, *, start, end, authorized=False):
     ):
         raise ValueError("Invalid clip timestamps")
     out = Path(destination)
-    if out.exists():
+    if out.exists() or out.is_symlink():
         raise FileExistsError(f"Refusing to overwrite {out}")
     source_info = inspect_video(source)
     if end > source_info["duration"] + 0.05:

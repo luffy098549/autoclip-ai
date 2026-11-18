@@ -1,0 +1,55 @@
+"""Media probing rejects corrupt metadata before editing authorized sources."""
+import json
+import subprocess
+
+import pytest
+
+from app import quality
+
+
+def _probe(tmp_path, monkeypatch, *, duration="12.5", width=1920, height=1080):
+    source = tmp_path / "owned.mp4"
+    source.write_bytes(b"fixture")
+    monkeypatch.setattr(quality.shutil, "which", lambda name: "/usr/bin/ffprobe")
+
+    def fake_run(command, **kwargs):
+        assert kwargs["timeout"] == 60
+        return subprocess.CompletedProcess(
+            command, 0, stdout=json.dumps({
+                "format": {"duration": duration},
+                "streams": [
+                    {"codec_type": "video", "width": width, "height": height},
+                    {"codec_type": "audio"},
+                ],
+            }),
+        )
+
+    monkeypatch.setattr(quality.subprocess, "run", fake_run)
+    return source
+
+
+@pytest.mark.parametrize("duration", ["NaN", "Infinity", "-Infinity", "0", "-1", "not-a-number", {}, None])
+def test_reject_bad_duration(tmp_path, monkeypatch, duration):
+    source = _probe(tmp_path, monkeypatch, duration=duration)
+    with pytest.raises(quality.MediaValidationError):
+        quality.inspect_video(source)
+
+
+@pytest.mark.parametrize("width,height", [(0, 1080), (1920, 0), (-1, 1080), ("bad", 1080), (None, 1080), (float("inf"), 1080)])
+def test_reject_bad_dimensions(tmp_path, monkeypatch, width, height):
+    source = _probe(tmp_path, monkeypatch, width=width, height=height)
+    with pytest.raises(quality.MediaValidationError):
+        quality.inspect_video(source)
+
+
+def test_valid_probe_metadata(tmp_path, monkeypatch):
+    source = _probe(tmp_path, monkeypatch)
+    info = quality.inspect_video(source)
+    assert info == {"duration": 12.5, "width": 1920, "height": 1080, "has_audio": True}
+
+
+@pytest.mark.parametrize("minimum", [float("nan"), float("inf"), -1, True, "1"])
+def test_invalid_minimum_rejected_before_probe(monkeypatch, minimum):
+    monkeypatch.setattr(quality, "inspect_video", lambda path: pytest.fail("Probe must not run"))
+    with pytest.raises(ValueError):
+        quality.validate_render("unused.mp4", expected_min_seconds=minimum)

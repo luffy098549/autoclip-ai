@@ -177,3 +177,40 @@ def test_export_ignores_attached_picture_streams(tmp_path, monkeypatch):
     video.render_vertical_clip(source, tmp_path / "clip.mp4", 0, 2)
     command = observed[0]
     assert command[command.index("-map") + 1] == "0:V:0"
+
+
+@pytest.mark.parametrize("failure", ["exit", "timeout"])
+def test_failed_export_removes_partial_file(tmp_path, monkeypatch, failure):
+    source = tmp_path / "authorized.mp4"
+    source.write_bytes(b"owned")
+    destination = tmp_path / "clip.mp4"
+
+    def failed_encoder(command, **kwargs):
+        destination.write_bytes(b"partial output")
+        if failure == "exit":
+            raise subprocess.CalledProcessError(1, command)
+        raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+
+    monkeypatch.setattr(video.subprocess, "run", failed_encoder)
+    expected = subprocess.CalledProcessError if failure == "exit" else subprocess.TimeoutExpired
+    with pytest.raises(expected):
+        video.render_vertical_clip(source, destination, 0, 3)
+    assert not destination.exists()
+
+
+def test_failed_export_does_not_unlink_symlink(tmp_path, monkeypatch):
+    source = tmp_path / "authorized.mp4"
+    source.write_bytes(b"owned")
+    destination = tmp_path / "clip.mp4"
+    protected = tmp_path / "protected.txt"
+    protected.write_text("keep")
+
+    def failed_encoder(command, **kwargs):
+        destination.symlink_to(protected)
+        raise subprocess.CalledProcessError(1, command)
+
+    monkeypatch.setattr(video.subprocess, "run", failed_encoder)
+    with pytest.raises(subprocess.CalledProcessError):
+        video.render_vertical_clip(source, destination, 0, 3)
+    assert destination.is_symlink()
+    assert protected.read_text() == "keep"

@@ -53,3 +53,22 @@ def test_invalid_minimum_rejected_before_probe(monkeypatch, minimum):
     monkeypatch.setattr(quality, "inspect_video", lambda path: pytest.fail("Probe must not run"))
     with pytest.raises(ValueError):
         quality.validate_render("unused.mp4", expected_min_seconds=minimum)
+
+
+@pytest.mark.parametrize("payload", [
+    "not json", "null", "[]", "42", "{}",
+    '{"streams": null, "format": {"duration": 5}}',
+    '{"streams": {}, "format": {"duration": 5}}',
+    '{"streams": [null], "format": {"duration": 5}}',
+    '{"streams": [{"codec_type": "video", "width": 100, "height": 100}], "format": []}',
+])
+def test_malformed_ffprobe_report_is_media_error(tmp_path, monkeypatch, payload):
+    source = tmp_path / "owned.mp4"
+    source.write_bytes(b"fixture")
+    monkeypatch.setattr(quality.shutil, "which", lambda name: "/usr/bin/ffprobe")
+    monkeypatch.setattr(
+        quality.subprocess, "run",
+        lambda command, **kwargs: subprocess.CompletedProcess(command, 0, stdout=payload),
+    )
+    with pytest.raises(quality.MediaValidationError):
+        quality.inspect_video(source)

@@ -20,13 +20,23 @@ def inspect_video(path):
         ["ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", str(media)],
         check=True, capture_output=True, text=True, timeout=60,
     )
-    report = json.loads(result.stdout)
-    streams = report.get("streams", [])
+    try:
+        report = json.loads(result.stdout)
+    except (ValueError, TypeError) as exc:
+        raise MediaValidationError("Invalid ffprobe JSON") from exc
+    if not isinstance(report, dict):
+        raise MediaValidationError("Invalid ffprobe report")
+    streams = report.get("streams")
+    if not isinstance(streams, list) or any(not isinstance(s, dict) for s in streams):
+        raise MediaValidationError("Invalid ffprobe streams")
     video = next((s for s in streams if s.get("codec_type") == "video"), None)
     if video is None:
         raise MediaValidationError("No video stream found")
+    fmt = report.get("format")
+    if not isinstance(fmt, dict):
+        raise MediaValidationError("Invalid ffprobe format")
     try:
-        duration = float(report.get("format", {}).get("duration") or 0)
+        duration = float(fmt.get("duration") or 0)
         width = int(video.get("width") or 0)
         height = int(video.get("height") or 0)
     except (TypeError, ValueError, OverflowError) as exc:

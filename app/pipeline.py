@@ -51,14 +51,22 @@ def create_local_clip_batch(source, output_dir, ranges, *, authorized=False):
         raise RightsNotConfirmed("Source must be authorized before editing")
     if not isinstance(ranges, (list, tuple)) or not 1 <= len(ranges) <= 5:
         raise ValueError("Provide between one and five clip ranges")
+    # Reject malformed requests before an expensive media probe. The probe is
+    # still required for duration-aware validation before any encoding starts.
+    for item in ranges:
+        if not isinstance(item, dict) or set(item) != {"start", "end"}:
+            raise ValueError("Each range needs start and end")
+        for value in (item["start"], item["end"]):
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+                raise ValueError("Invalid clip timestamps")
+        if item["start"] < 0 or item["end"] <= item["start"]:
+            raise ValueError("Invalid clip timestamps")
     source_info = inspect_video(source)
     if not source_info["has_audio"]:
         raise ValueError("Source has no audio")
     validated = []
     seen = set()
     for item in ranges:
-        if not isinstance(item, dict) or set(item) != {"start", "end"}:
-            raise ValueError("Each range needs start and end")
         segment = validate_clip_range(
             {"duration_seconds": source_info["duration"]}, item["start"], item["end"]
         )

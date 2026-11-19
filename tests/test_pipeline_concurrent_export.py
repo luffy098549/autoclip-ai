@@ -47,15 +47,15 @@ def test_rights_check_precedes_media_probe(tmp_path):
         probe.assert_not_called()
 
 
-@pytest.mark.parametrize("start,end", [
-    (0, 301), (10, 9), (0, 21), (float("nan"), 5),
+@pytest.mark.parametrize("start,end,source_duration", [
+    (0, 301, 400), (10, 9, 400), (0, 21, 20), (float("nan"), 5, 400),
 ])
-def test_pipeline_rejects_invalid_ranges_before_render(tmp_path, start, end):
+def test_pipeline_rejects_invalid_ranges_before_render(tmp_path, start, end, source_duration):
     source = tmp_path / "authorized.mp4"
     source.write_bytes(b"synthetic fixture")
     target = tmp_path / "clip.mp4"
     with patch("app.pipeline.inspect_video", return_value={
-        "duration": 400, "has_audio": True, "width": 320, "height": 180,
+        "duration": source_duration, "has_audio": True, "width": 320, "height": 180,
     }), patch("app.pipeline.render_vertical_clip") as render:
         with pytest.raises(ValueError):
             create_local_clip(source, target, start=start, end=end, authorized=True)
@@ -73,3 +73,15 @@ def test_pipeline_passes_validated_bounds_to_renderer(tmp_path):
         result = create_local_clip(source, target, start=2, end=12, authorized=True)
     render.assert_called_once_with(source, target, 2.0, 12.0)
     assert result["path"] == target
+
+
+def test_pipeline_allows_clip_longer_than_twenty_seconds_when_source_supports_it(tmp_path):
+    source = tmp_path / "authorized.mp4"
+    source.write_bytes(b"synthetic fixture")
+    target = tmp_path / "clip.mp4"
+    info = {"duration": 400, "has_audio": True, "width": 320, "height": 180}
+    with patch("app.pipeline.inspect_video", return_value=info), \
+         patch("app.pipeline.render_vertical_clip", return_value=target) as render, \
+         patch("app.pipeline.validate_render", return_value=info):
+        create_local_clip(source, target, start=0, end=21, authorized=True)
+    render.assert_called_once_with(source, target, 0.0, 21.0)

@@ -3,6 +3,7 @@ import math
 from pathlib import Path
 
 from .quality import inspect_video, validate_render
+from .media_probe import validate_clip_range
 from .video import render_vertical_clip
 
 
@@ -26,11 +27,12 @@ def create_local_clip(source, destination, *, start, end, authorized=False):
     if out.exists() or out.is_symlink():
         raise FileExistsError(f"Refusing to overwrite {out}")
     source_info = inspect_video(source)
-    if end > source_info["duration"] + 0.05:
-        raise ValueError("Clip exceeds source duration")
+    validated = validate_clip_range(
+        {"duration_seconds": source_info["duration"]}, start, end,
+    )
     if not source_info["has_audio"]:
         raise ValueError("Source has no audio")
     # render_vertical_clip owns and cleans its exclusive temporary file. Never
     # unlink the destination on failure: another worker may have won publication.
-    result = render_vertical_clip(source, out, start, end)
+    result = render_vertical_clip(source, out, validated["start_seconds"], validated["end_seconds"])
     return {"path": result, "source": source_info, "export": validate_render(result)}

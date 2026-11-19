@@ -94,12 +94,14 @@ def render_clip_batch_task(clip_ids):
 
     from . import create_app
     from .services.clip_processor import process_clip
-    from .models import db, Clip
+    from .models import db, Clip, MediaSource
+    from .services.rights import assess_rights
 
     app = create_app()
     completed = []
     failed = []
     skipped = []
+    unauthorized = []
     with app.app_context():
         for clip_id in clip_ids:
             try:
@@ -108,6 +110,12 @@ def render_clip_batch_task(clip_ids):
                 # another worker currently processing the same record.
                 if clip is None or clip.editorial_status not in {"draft", "failed"}:
                     skipped.append(clip_id)
+                    continue
+                source = db.session.get(MediaSource, clip.source_id)
+                if source is None or not assess_rights(
+                    source.rights_status, source.permission_evidence
+                ).allowed:
+                    unauthorized.append(clip_id)
                     continue
                 process_clip(clip_id)
             except Exception:
@@ -121,4 +129,5 @@ def render_clip_batch_task(clip_ids):
         "rendered_clip_ids": completed,
         "failed_clip_ids": failed,
         "skipped_clip_ids": skipped,
+        "unauthorized_clip_ids": unauthorized,
     }

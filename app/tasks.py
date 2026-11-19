@@ -92,18 +92,36 @@ def render_clip_batch_task(clip_ids):
 
     from . import create_app
     from .services.clip_processor import process_clip
+    from .models import db, Clip
 
     app = create_app()
     completed = []
     failed = []
+    skipped = []
     with app.app_context():
         for clip_id in clip_ids:
             try:
+                clip = db.session.get(Clip, clip_id)
+                # Never overwrite an already approved/published clip, or race
+                # another worker currently processing the same record.
+                if clip is None or clip.editorial_status in {
+                    "rejected", "approved", "published", "processing"
+                }:
+                    skipped.append(clip_id)
+                    continue
+                if clip.editorial_status == "ready":
+                    skipped.append(clip_id)
+                    continue
                 process_clip(clip_id)
             except Exception:
-                # Do not leak file paths, authorization evidence, or credentials
-                # from processor exceptions into the task result.
+                # A failure in one clip must not poison the SQLAlchemy session
+                # used for the remaining independent renders.
+                db.session.rollback()
                 failed.append(clip_id)
             else:
                 completed.append(clip_id)
-    return {"rendered_clip_ids": completed, "failed_clip_ids": failed}
+    return {
+        "rendered_clip_ids": completed,
+        "failed_clip_ids": failed,
+        "skipped_clip_ids": skipped,
+    }

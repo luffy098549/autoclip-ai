@@ -78,8 +78,11 @@ def create_local_clip_batch(source, output_dir, ranges, *, authorized=False):
     folder = Path(output_dir)
     # Keep batch exports inside a real directory, never a symlink that could
     # redirect writes into an unrelated location. Reject before encoding.
-    if folder.is_symlink():
-        raise ValueError("Export directory must not be a symlink")
+    # Reject symlinks anywhere in the output path, not just the final folder.
+    # Otherwise an existing parent alias can redirect exports outside the
+    # operator-selected directory even when the leaf itself is not a symlink.
+    if any(part.is_symlink() for part in (folder, *folder.parents)):
+        raise ValueError("Export directory path must not contain a symlink")
     if folder.exists() and not folder.is_dir():
         raise NotADirectoryError("Export destination is not a directory")
     targets = [folder / f"clip-{index:02d}.mp4"

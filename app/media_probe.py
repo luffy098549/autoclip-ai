@@ -62,6 +62,11 @@ def validate_clip_range(metadata, start_seconds, end_seconds, *, max_duration_se
     """Validate a requested clip against inspected media before scheduling FFmpeg."""
     if not isinstance(metadata, dict):
         raise ValueError("Invalid video metadata")
+    # bool is an int subclass, but never a meaningful timestamp or duration.
+    if (isinstance(start_seconds, bool) or isinstance(end_seconds, bool)
+            or isinstance(max_duration_seconds, bool)
+            or isinstance(metadata.get("duration_seconds"), bool)):
+        raise ValueError("Invalid clip range")
     try:
         duration = float(metadata["duration_seconds"])
         start = float(start_seconds)

@@ -59,3 +59,34 @@ def test_batch_refuses_existing_output_before_encoding(fake_exports):
         pipeline.create_local_clip_batch("source.mp4", folder,
             [{"start": 0, "end": 10}, {"start": 20, "end": 30}], authorized=True)
     assert calls == []
+
+
+@pytest.mark.parametrize("index", [1, 2])
+def test_batch_rejects_source_destination_collision_before_any_encode(fake_exports, index):
+    calls, folder = fake_exports
+    source = folder / f"clip-{index:02d}.mp4"
+    source.write_bytes(b"authorized source")
+    with pytest.raises(ValueError, match="Source and export destination"):
+        pipeline.create_local_clip_batch(
+            source, folder,
+            [{"start": 0, "end": 10}, {"start": 20, "end": 30}],
+            authorized=True,
+        )
+    assert calls == []
+    assert source.read_bytes() == b"authorized source"
+    assert not (folder / f"clip-{3-index:02d}.mp4").exists()
+
+
+def test_batch_rejects_alias_to_source_before_encoding(fake_exports):
+    calls, folder = fake_exports
+    source = folder / "clip-02.mp4"
+    source.write_bytes(b"authorized source")
+    alias_folder = folder / "subfolder" / ".."
+    (folder / "subfolder").mkdir()
+    with pytest.raises(ValueError, match="Source and export destination"):
+        pipeline.create_local_clip_batch(
+            source, alias_folder,
+            [{"start": 0, "end": 10}, {"start": 20, "end": 30}],
+            authorized=True,
+        )
+    assert calls == []

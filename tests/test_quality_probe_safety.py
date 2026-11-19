@@ -68,3 +68,17 @@ def test_cover_art_alone_is_not_video(tmp_path):
         run.return_value.stdout = json.dumps(payload)
         with pytest.raises(MediaValidationError, match="No video stream"):
             inspect_video(source)
+
+
+def test_quality_probe_disallows_remote_protocols(tmp_path):
+    source = tmp_path / "authorized.mp4"
+    source.write_bytes(b"synthetic")
+    payload = {"streams": [{"codec_type": "video", "width": 320,
+                            "height": 180}], "format": {"duration": "12"}}
+    with patch("app.quality.shutil.which", return_value="/usr/bin/ffprobe"), \\
+         patch("app.quality.subprocess.run") as run:
+        run.return_value.stdout = json.dumps(payload)
+        assert inspect_video(source)["duration"] == 12
+        args = run.call_args.args[0]
+        assert args[args.index("-protocol_whitelist") + 1] == "file"
+        assert run.call_args.kwargs["stdin"] is subprocess.DEVNULL

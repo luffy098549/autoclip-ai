@@ -30,7 +30,7 @@ def render_vertical_clip(input_file, output_file, start_sec, end_sec):
     command = [
         "ffmpeg", "-hide_banner", "-nostdin", "-y", "-ss", str(start_sec),
         "-protocol_whitelist", "file", "-i", str(source), "-t", str(end_sec - start_sec),
-        "-map", "0:V:0", "-map", "0:a:0?",
+        "-map", "0:V:0", "-map", "0:a:0?", "-map_metadata", "-1", "-map_chapters", "-1",
         "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
         "-pix_fmt", "yuv420p",

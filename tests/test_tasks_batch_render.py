@@ -25,10 +25,16 @@ def batch_context(monkeypatch):
     seen = []
     rollbacks = []
     monkeypatch.setattr(db.session, "get", lambda model, clip_id: (
-        SimpleNamespace(editorial_status=statuses.get(clip_id, "draft"))
+        SimpleNamespace(editorial_status=statuses.get(clip_id, "draft"), source_id=10)
         if statuses.get(clip_id) != "missing" else None
     ))
     monkeypatch.setattr(db.session, "rollback", lambda: rollbacks.append(True))
+    from app.models import MediaSource
+    previous_get = db.session.get
+    monkeypatch.setattr(db.session, "get", lambda model, identifier: (
+        SimpleNamespace(rights_status="owned", permission_evidence="test-owned-video")
+        if model is MediaSource else previous_get(model, identifier)
+    ))
     return statuses, seen, rollbacks
 
 
@@ -47,7 +53,7 @@ def test_batch_processes_independently_without_publishing(monkeypatch, batch_con
     assert result == {
         "rendered_clip_ids": [1, 3],
         "failed_clip_ids": [2],
-        "skipped_clip_ids": [],
+        "skipped_clip_ids": [], "unauthorized_clip_ids": [],
     }
     assert len(rollbacks) == 1
     assert "private" not in repr(result)
@@ -69,7 +75,7 @@ def test_batch_skips_protected_or_missing_clips(monkeypatch, batch_context, stat
     statuses[2] = status
     monkeypatch.setattr(clip_processor, "process_clip", lambda clip_id: seen.append(clip_id))
     assert render_clip_batch_task([1, 2, 3]) == {
-        "rendered_clip_ids": [1, 3], "failed_clip_ids": [], "skipped_clip_ids": [2]
+        "rendered_clip_ids": [1, 3], "failed_clip_ids": [], "skipped_clip_ids": [2], "unauthorized_clip_ids": []
     }
     assert seen == [1, 3]
 
@@ -141,3 +147,21 @@ def test_analyze_auto_render_skips_non_renderable_states(monkeypatch, status):
     result = analyze_source_task(10)
     assert result["rendered_clip_ids"] == []
     assert result["failed_clip_ids"] == []
+
+
+def test_batch_rejects_unauthorized_source_without_rendering(monkeypatch, batch_context):
+    from app.models import Clip, MediaSource
+    statuses, seen, rollbacks = batch_context
+    previous_get = db.session.get
+    monkeypatch.setattr(db.session, "get", lambda model, identifier: (
+        SimpleNamespace(rights_status="unverified", permission_evidence=None)
+        if model is MediaSource and identifier == 10
+        else previous_get(model, identifier)
+    ))
+    monkeypatch.setattr(clip_processor, "process_clip", lambda clip_id: seen.append(clip_id))
+    result = render_clip_batch_task([1, 2])
+    assert seen == []
+    assert result["unauthorized_clip_ids"] == [1, 2]
+    assert result["rendered_clip_ids"] == []
+    assert result["failed_clip_ids"] == []
+    assert rollbacks == []

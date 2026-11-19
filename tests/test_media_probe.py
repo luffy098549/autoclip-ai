@@ -149,3 +149,14 @@ def test_clip_range_accepts_valid_bounds():
 def test_clip_range_rejects_missing_duration():
     with pytest.raises(ValueError, match="Invalid clip range"):
         validate_clip_range({}, 0, 10)
+
+
+@pytest.mark.parametrize("metadata,start,end,limit", [
+    ({"duration_seconds": True}, 0, 10, 300),
+    ({"duration_seconds": 45}, True, 10, 300),
+    ({"duration_seconds": 45}, 0, False, 300),
+    ({"duration_seconds": 45}, 0, 10, True),
+])
+def test_clip_range_rejects_boolean_values(metadata, start, end, limit):
+    with pytest.raises(ValueError, match="Invalid clip range"):
+        validate_clip_range(metadata, start, end, max_duration_seconds=limit)

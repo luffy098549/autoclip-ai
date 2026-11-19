@@ -61,7 +61,8 @@ def test_batch_accepts_single_clip(monkeypatch, batch_context):
 
 
 @pytest.mark.parametrize("status", [
-    "ready", "rejected", "processing", "approved", "published", "missing"
+    "ready", "rejected", "processing", "approved", "published", "missing",
+    "scheduled", "unknown", "rendering"
 ])
 def test_batch_skips_protected_or_missing_clips(monkeypatch, batch_context, status):
     statuses, seen, _ = batch_context
@@ -71,3 +72,14 @@ def test_batch_skips_protected_or_missing_clips(monkeypatch, batch_context, stat
         "rendered_clip_ids": [1, 3], "failed_clip_ids": [], "skipped_clip_ids": [2]
     }
     assert seen == [1, 3]
+
+
+def test_batch_allows_explicit_retry_of_failed_clips(monkeypatch, batch_context):
+    statuses, seen, _ = batch_context
+    statuses[2] = "failed"
+    monkeypatch.setattr(clip_processor, "process_clip", lambda clip_id: seen.append(clip_id))
+    result = render_clip_batch_task([2])
+    assert result == {
+        "rendered_clip_ids": [2], "failed_clip_ids": [], "skipped_clip_ids": []
+    }
+    assert seen == [2]

@@ -39,8 +39,14 @@ def inspect_local_video(path):
         if not isinstance(fmt, dict):
             raise ValueError("Invalid video metadata")
         duration = float(fmt.get("duration", 0))
-        width = videos[0].get("width")
-        height = videos[0].get("height")
+        # Prefer a valid picture stream when a container has multiple video tracks.
+        usable = [s for s in videos if type(s.get("width")) is int
+                  and type(s.get("height")) is int
+                  and s["width"] > 0 and s["height"] > 0]
+        if not usable:
+            raise ValueError("Invalid video metadata")
+        width = usable[0]["width"]
+        height = usable[0]["height"]
         if (not math.isfinite(duration) or duration <= 0
                 or type(width) is not int or type(height) is not int
                 or width <= 0 or height <= 0):
@@ -50,3 +56,22 @@ def inspect_local_video(path):
     return {"duration_seconds": duration, "width": width, "height": height,
             "has_audio": any(isinstance(s, dict) and s.get("codec_type") == "audio"
                              for s in streams)}
+
+
+def validate_clip_range(metadata, start_seconds, end_seconds, *, max_duration_seconds=300):
+    """Validate a requested clip against inspected media before scheduling FFmpeg."""
+    if not isinstance(metadata, dict):
+        raise ValueError("Invalid video metadata")
+    try:
+        duration = float(metadata["duration_seconds"])
+        start = float(start_seconds)
+        end = float(end_seconds)
+        limit = float(max_duration_seconds)
+    except (KeyError, TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("Invalid clip range") from exc
+    if (not all(math.isfinite(v) for v in (duration, start, end, limit))
+            or duration <= 0 or limit <= 0 or start < 0 or end <= start
+            or end > duration + 1e-6 or end - start > limit):
+        raise ValueError("Invalid clip range")
+    return {"start_seconds": start, "end_seconds": end,
+            "duration_seconds": end - start}

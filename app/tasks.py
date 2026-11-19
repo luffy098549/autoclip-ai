@@ -74,3 +74,36 @@ def youtube_metadata_task(streamer_id: int):
     app = create_app()
     with app.app_context():
         return sync_youtube_channel(streamer_id, key)
+
+
+@celery_app.task(name="autoclip.render_clip_batch_task")
+def render_clip_batch_task(clip_ids):
+    """Render up to five existing clip records for manual review; never publish.
+
+    Each clip is processed independently so one failed render cannot prevent
+    the remaining authorized clips from being attempted.
+    """
+    if not isinstance(clip_ids, (list, tuple)) or not 1 <= len(clip_ids) <= 5:
+        raise ValueError("Provide between one and five clip IDs")
+    if any(type(clip_id) is not int or clip_id <= 0 for clip_id in clip_ids):
+        raise ValueError("Clip IDs must be positive integers")
+    if len(set(clip_ids)) != len(clip_ids):
+        raise ValueError("Duplicate clip IDs")
+
+    from . import create_app
+    from .services.clip_processor import process_clip
+
+    app = create_app()
+    completed = []
+    failed = []
+    with app.app_context():
+        for clip_id in clip_ids:
+            try:
+                process_clip(clip_id)
+            except Exception:
+                # Do not leak file paths, authorization evidence, or credentials
+                # from processor exceptions into the task result.
+                failed.append(clip_id)
+            else:
+                completed.append(clip_id)
+    return {"rendered_clip_ids": completed, "failed_clip_ids": failed}

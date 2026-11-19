@@ -68,7 +68,7 @@ def create_local_clip_batch(source, output_dir, ranges, *, authorized=False):
     folder = Path(output_dir)
     targets = [folder / f"clip-{index:02d}.mp4"
                for index in range(1, len(validated) + 1)]
-    if any(target.exists() or target.is_symlink() for target in targets):
+    # Preflight all paths before starting any encode. A source named clip-02.mp4\n    # inside output_dir must not become the second destination after clip 01\n    # has already been rendered. Resolve also catches alternate path spellings.\n    source_path = Path(source).resolve()\n    if any(target.resolve() == source_path for target in targets):\n        raise ValueError("Source and export destination must differ")\n    if any(target.exists() or target.is_symlink() for target in targets):
         raise FileExistsError("An export destination already exists")
     exports = []
     for target, segment in zip(targets, validated):

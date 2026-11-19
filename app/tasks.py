@@ -44,7 +44,7 @@ def analyze_source_task(source_id: int):
                     successes.append(clip_id)
                     continue
                 try:
-                    if not clip or clip.editorial_status in {"rejected", "processing", "approved", "published"}:
+                    if not clip or clip.editorial_status not in {"draft", "failed"}:
                         continue
                     source = db.session.get(MediaSource, clip.source_id)
                     if source is None or not assess_rights(source.rights_status, source.permission_evidence).allowed:
@@ -56,7 +56,9 @@ def analyze_source_task(source_id: int):
                     process_clip(clip_id)
                     successes.append(clip_id)
                 except Exception:
-                    # process_clip persists a failed state. Do not abort other candidates.
+                    # A failed commit or render can invalidate the session; recover
+                    # before looking up the next candidate in this batch.
+                    db.session.rollback()
                     failures.append(clip_id)
             result["rendered_clip_ids"] = successes
             result["failed_clip_ids"] = failures

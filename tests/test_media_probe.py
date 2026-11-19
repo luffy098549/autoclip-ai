@@ -5,7 +5,7 @@ import subprocess
 from unittest.mock import patch
 
 import pytest
-from app.media_probe import inspect_local_video
+from app.media_probe import inspect_local_video, validate_clip_range
 
 
 def test_missing_source(tmp_path):
@@ -112,3 +112,40 @@ def test_probe_handles_unexpected_nested_metadata(tmp_path, payload):
         else:
             with pytest.raises(ValueError, match="Invalid video metadata"):
                 inspect_local_video(source)
+
+
+def test_choose_usable_secondary_video_stream(tmp_path):
+    source = tmp_path / "multi.mp4"
+    source.write_bytes(b"fixture")
+    with patch("app.media_probe.subprocess.run") as run:
+        run.return_value.stdout = json.dumps({
+            "streams": [
+                {"codec_type": "video", "width": 0, "height": 0},
+                {"codec_type": "video", "width": 720, "height": 1280},
+            ],
+            "format": {"duration": "45"},
+        })
+        assert inspect_local_video(source)["width"] == 720
+
+
+@pytest.mark.parametrize("start,end,limit", [
+    (-1, 10, 300), (10, 10, 300), (20, 10, 300),
+    (0, 46, 300), (0, 40, 30), (float("nan"), 10, 300),
+    (0, float("inf"), 300), (0, 10, 0),
+    (0, 10, float("nan")), ("bad", 10, 300),
+])
+def test_reject_invalid_clip_ranges(start, end, limit):
+    with pytest.raises(ValueError, match="Invalid clip range"):
+        validate_clip_range({"duration_seconds": 45}, start, end,
+                            max_duration_seconds=limit)
+
+
+def test_clip_range_accepts_valid_bounds():
+    result = validate_clip_range({"duration_seconds": 45}, "5", 45)
+    assert result == {"start_seconds": 5.0, "end_seconds": 45.0,
+                      "duration_seconds": 40.0}
+
+
+def test_clip_range_rejects_missing_duration():
+    with pytest.raises(ValueError, match="Invalid clip range"):
+        validate_clip_range({}, 0, 10)

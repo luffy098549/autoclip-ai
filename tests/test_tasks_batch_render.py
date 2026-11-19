@@ -83,3 +83,61 @@ def test_batch_allows_explicit_retry_of_failed_clips(monkeypatch, batch_context)
         "rendered_clip_ids": [2], "failed_clip_ids": [], "skipped_clip_ids": []
     }
     assert seen == [2]
+
+
+def test_analyze_auto_render_recovers_after_failed_candidate(monkeypatch):
+    """A broken DB session from one render must not block the next candidate."""
+    from app.tasks import analyze_source_task
+    from app.services import analyzer, daily_review, rights
+    from app.models import Clip, MediaSource
+
+    flask_app = Flask(__name__)
+    flask_app.config["AUTO_RENDER_ENABLED"] = True
+    monkeypatch.setattr(app, "create_app", lambda: flask_app)
+    monkeypatch.setattr(analyzer, "analyze_source", lambda source_id: {"clip_ids": [1, 2]})
+    monkeypatch.setattr(daily_review, "reserve_review_slot", lambda clip_id: clip_id)
+    monkeypatch.setattr(rights, "assess_rights", lambda *args: SimpleNamespace(allowed=True))
+    clips = {
+        1: SimpleNamespace(editorial_status="draft", source_id=10),
+        2: SimpleNamespace(editorial_status="failed", source_id=10),
+    }
+    source = SimpleNamespace(rights_status="owned", permission_evidence="test-owned-media")
+    monkeypatch.setattr(db.session, "get", lambda model, identifier: (
+        clips.get(identifier) if model is Clip else source if model is MediaSource else None
+    ))
+    rollbacks = []
+    monkeypatch.setattr(db.session, "rollback", lambda: rollbacks.append(True))
+    attempts = []
+
+    def process(clip_id):
+        attempts.append(clip_id)
+        if clip_id == 1:
+            raise RuntimeError("internal private path")
+
+    monkeypatch.setattr(clip_processor, "process_clip", process)
+    result = analyze_source_task(10)
+    assert attempts == [1, 2]
+    assert result["rendered_clip_ids"] == [2]
+    assert result["failed_clip_ids"] == [1]
+    assert rollbacks == [True]
+    assert "private" not in repr(result)
+
+
+@pytest.mark.parametrize("status", ["scheduled", "unknown", "rejected", "processing", "approved", "published"])
+def test_analyze_auto_render_skips_non_renderable_states(monkeypatch, status):
+    from app.tasks import analyze_source_task
+    from app.services import analyzer
+    from app.models import Clip
+
+    flask_app = Flask(__name__)
+    flask_app.config["AUTO_RENDER_ENABLED"] = True
+    monkeypatch.setattr(app, "create_app", lambda: flask_app)
+    monkeypatch.setattr(analyzer, "analyze_source", lambda source_id: {"clip_ids": [4]})
+    monkeypatch.setattr(db.session, "get", lambda model, identifier: (
+        SimpleNamespace(editorial_status=status) if model is Clip else None
+    ))
+    monkeypatch.setattr(clip_processor, "process_clip",
+                        lambda clip_id: pytest.fail("Non-renderable clip processed"))
+    result = analyze_source_task(10)
+    assert result["rendered_clip_ids"] == []
+    assert result["failed_clip_ids"] == []

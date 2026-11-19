@@ -88,7 +88,7 @@ def test_reject_dangling_symlink_output(tmp_path, monkeypatch):
 @pytest.mark.parametrize("start,end,expected", [
     (0, 2, 120),
     (0, 20, 600),
-    (0, 500, 3600),
+    (0, 120, 3600),
 ])
 def test_export_has_bounded_timeout(tmp_path, monkeypatch, start, end, expected):
     source = tmp_path / "source.mp4"
@@ -155,19 +155,16 @@ def test_export_uses_compatible_video_and_audio_formats(tmp_path, monkeypatch):
     assert command[command.index("-c:a") + 1] == "aac"
 
 
-def test_timeout_handles_extremely_large_finite_clip_duration(tmp_path, monkeypatch):
+def test_reject_extremely_large_finite_clip_duration_before_ffmpeg(tmp_path, monkeypatch):
     source = tmp_path / "authorized.mp4"
     source.write_bytes(b"fixture")
-    observed = []
 
-    def fake_run(command, **kwargs):
-        observed.append(kwargs["timeout"])
-        Path(command[-1]).write_bytes(b"encoded fixture")
-        return subprocess.CompletedProcess(command, 0)
+    def unexpected(*args, **kwargs):
+        pytest.fail("FFmpeg must not run for clips exceeding five minutes")
 
-    monkeypatch.setattr(video.subprocess, "run", fake_run)
-    video.render_vertical_clip(source, tmp_path / "clip.mp4", 0, 1e308)
-    assert observed == [3600]
+    monkeypatch.setattr(video.subprocess, "run", unexpected)
+    with pytest.raises(ValueError, match="Invalid timestamps"):
+        video.render_vertical_clip(source, tmp_path / "clip.mp4", 0, 1e308)
 
 
 def test_export_ignores_attached_picture_streams(tmp_path, monkeypatch):

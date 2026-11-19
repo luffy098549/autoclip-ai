@@ -11,7 +11,8 @@ def inspect_local_video(path):
     if not source.is_file():
         raise FileNotFoundError(source)
     result = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries",
+        ["ffprobe", "-v", "error", "-protocol_whitelist", "file",
+         "-show_entries",
          "format=duration:stream=codec_type,width,height,disposition",
          "-of", "json", str(source)],
         check=True, capture_output=True, text=True, timeout=30,

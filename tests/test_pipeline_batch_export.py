@@ -109,3 +109,31 @@ def test_batch_malformed_ranges_rejected_before_probe(tmp_path, monkeypatch, ran
     with pytest.raises(ValueError):
         pipeline.create_local_clip_batch("authorized.mp4", tmp_path, ranges,
                                          authorized=True)
+
+
+def test_batch_rejects_symlink_export_directory_before_render(fake_exports):
+    calls, folder = fake_exports
+    actual = folder / "actual"
+    actual.mkdir()
+    alias = folder / "alias"
+    alias.symlink_to(actual, target_is_directory=True)
+    with pytest.raises(ValueError, match="symlink"):
+        pipeline.create_local_clip_batch(
+            "authorized.mp4", alias, [{"start": 0, "end": 10}],
+            authorized=True,
+        )
+    assert calls == []
+    assert list(actual.iterdir()) == []
+
+
+def test_batch_rejects_file_as_export_directory_before_render(fake_exports):
+    calls, folder = fake_exports
+    target = folder / "not-a-directory"
+    target.write_text("preserve")
+    with pytest.raises(NotADirectoryError):
+        pipeline.create_local_clip_batch(
+            "authorized.mp4", target, [{"start": 0, "end": 10}],
+            authorized=True,
+        )
+    assert calls == []
+    assert target.read_text() == "preserve"

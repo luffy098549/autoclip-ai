@@ -105,7 +105,9 @@ def test_probe_handles_unexpected_nested_metadata(tmp_path, payload):
     source.write_bytes(b"fixture")
     with patch("app.media_probe.subprocess.run") as run:
         run.return_value.stdout = json.dumps(payload)
-        if payload["format"] and payload["streams"][0].get("disposition") is None:
+        if (isinstance(payload["format"], dict)
+                and isinstance(payload["format"].get("duration"), str)
+                and payload["streams"][0].get("disposition") is None):
             assert inspect_local_video(source)["width"] == 320
         else:
             with pytest.raises(ValueError, match="Invalid video metadata"):

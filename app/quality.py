@@ -19,6 +19,7 @@ def inspect_video(path):
     result = subprocess.run(
         ["ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", str(media)],
         check=True, capture_output=True, text=True, timeout=60,
+        stdin=subprocess.DEVNULL,
     )
     try:
         report = json.loads(result.stdout)
@@ -58,8 +59,10 @@ def inspect_video(path):
             return number if math.isfinite(number) and number > 0 else 0.0
 
         duration = positive_duration(container_duration) or positive_duration(stream_duration)
-        width = int(video.get("width") or 0)
-        height = int(video.get("height") or 0)
+        width = video.get("width")
+        height = video.get("height")
+        if (type(width) is not int or type(height) is not int):
+            raise MediaValidationError("Invalid video dimensions")
     except (TypeError, ValueError, OverflowError) as exc:
         raise MediaValidationError("Invalid video metadata") from exc
     if not math.isfinite(duration) or duration <= 0:

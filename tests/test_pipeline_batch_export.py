@@ -90,3 +90,22 @@ def test_batch_rejects_alias_to_source_before_encoding(fake_exports):
             authorized=True,
         )
     assert calls == []
+
+
+@pytest.mark.parametrize("ranges", [
+    [{"start": 0, "end": 10, "extra": 1}],
+    [{"start": float("nan"), "end": 10}],
+    [{"start": 0, "end": float("inf")}],
+    [{"start": True, "end": 10}],
+    [{"start": -1, "end": 10}],
+    [{"start": 10, "end": 10}],
+    [{"start": 0, "end": 10}, {"start": "bad", "end": 20}],
+])
+def test_batch_malformed_ranges_rejected_before_probe(tmp_path, monkeypatch, ranges):
+    monkeypatch.setattr(pipeline, "inspect_video",
+                        lambda _: pytest.fail("invalid batch must not invoke ffprobe"))
+    monkeypatch.setattr(pipeline, "render_vertical_clip",
+                        lambda *args: pytest.fail("invalid batch must not encode"))
+    with pytest.raises(ValueError):
+        pipeline.create_local_clip_batch("authorized.mp4", tmp_path, ranges,
+                                         authorized=True)

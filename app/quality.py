@@ -30,16 +30,19 @@ def inspect_video(path):
     streams = report.get("streams")
     if not isinstance(streams, list) or any(not isinstance(s, dict) for s in streams):
         raise MediaValidationError("Invalid ffprobe streams")
+    candidates = [
+        stream for stream in streams
+        if stream.get("codec_type") == "video"
+        and not (
+            isinstance(stream.get("disposition"), dict)
+            and stream["disposition"].get("attached_pic")
+        )
+    ]
     video = next(
-        (
-            stream for stream in streams
-            if stream.get("codec_type") == "video"
-            and not (
-                isinstance(stream.get("disposition"), dict)
-                and stream["disposition"].get("attached_pic")
-            )
-        ),
-        None,
+        (stream for stream in candidates
+         if type(stream.get("width")) is int and stream["width"] > 0
+         and type(stream.get("height")) is int and stream["height"] > 0),
+        candidates[0] if candidates else None,
     )
     if video is None:
         raise MediaValidationError("No video stream found")

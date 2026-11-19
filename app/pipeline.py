@@ -76,6 +76,12 @@ def create_local_clip_batch(source, output_dir, ranges, *, authorized=False):
         seen.add(key)
         validated.append(segment)
     folder = Path(output_dir)
+    # Keep batch exports inside a real directory, never a symlink that could
+    # redirect writes into an unrelated location. Reject before encoding.
+    if folder.is_symlink():
+        raise ValueError("Export directory must not be a symlink")
+    if folder.exists() and not folder.is_dir():
+        raise NotADirectoryError("Export destination is not a directory")
     targets = [folder / f"clip-{index:02d}.mp4"
                for index in range(1, len(validated) + 1)]
     # Preflight all paths before starting any encode. A source named clip-02.mp4

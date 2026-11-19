@@ -42,7 +42,7 @@ def test_successful_render(tmp_path, video_stubs):
     assert video_stubs == [(2, 6)]
 
 
-def test_render_failure_removes_partial_file(tmp_path, monkeypatch, video_stubs):
+def test_render_failure_preserves_other_worker_destination(tmp_path, monkeypatch, video_stubs):
     target = tmp_path / "clip.mp4"
 
     def fail_render(*args):
@@ -53,10 +53,10 @@ def test_render_failure_removes_partial_file(tmp_path, monkeypatch, video_stubs)
     with pytest.raises(RuntimeError, match="ffmpeg failed"):
         pipeline.create_local_clip("owned.mp4", target,
                                    start=0, end=5, authorized=True)
-    assert not target.exists()
+    assert target.read_bytes() == b"partial mp4"
 
 
-def test_validation_failure_removes_partial_file(tmp_path, monkeypatch, video_stubs):
+def test_validation_failure_preserves_published_destination(tmp_path, monkeypatch, video_stubs):
     target = tmp_path / "clip.mp4"
 
     def render(*args):
@@ -69,7 +69,7 @@ def test_validation_failure_removes_partial_file(tmp_path, monkeypatch, video_st
     with pytest.raises(ValueError, match="invalid output"):
         pipeline.create_local_clip("owned.mp4", target,
                                    start=0, end=5, authorized=True)
-    assert not target.exists()
+    assert target.read_bytes() == b"invalid mp4"
 
 
 def test_existing_export_never_overwritten_or_deleted(tmp_path, monkeypatch, video_stubs):

@@ -62,7 +62,7 @@ def test_batch_processes_independently_without_publishing(monkeypatch, batch_con
 def test_batch_accepts_single_clip(monkeypatch, batch_context):
     monkeypatch.setattr(clip_processor, "process_clip", lambda clip_id: None)
     assert render_clip_batch_task([7]) == {
-        "rendered_clip_ids": [7], "failed_clip_ids": [], "skipped_clip_ids": []
+        "rendered_clip_ids": [7], "failed_clip_ids": [], "skipped_clip_ids": [], "unauthorized_clip_ids": []
     }
 
 

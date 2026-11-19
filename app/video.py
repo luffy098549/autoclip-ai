@@ -15,7 +15,8 @@ def render_vertical_clip(input_file, output_file, start_sec, end_sec):
             or not isinstance(start_sec, (int, float))
             or not isinstance(end_sec, (int, float))
             or not math.isfinite(start_sec) or not math.isfinite(end_sec)
-            or start_sec < 0 or end_sec <= start_sec):
+            or start_sec < 0 or end_sec <= start_sec
+            or end_sec - start_sec > 300):
         raise ValueError("Invalid timestamps")
     if source.resolve() == target.resolve():
         raise ValueError("Input and output must be different files")

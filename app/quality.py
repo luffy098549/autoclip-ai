@@ -17,7 +17,8 @@ def inspect_video(path):
     if not shutil.which("ffprobe"):
         raise RuntimeError("ffprobe must be installed")
     result = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", str(media)],
+        ["ffprobe", "-v", "error", "-protocol_whitelist", "file",
+         "-show_streams", "-show_format", "-of", "json", str(media)],
         check=True, capture_output=True, text=True, timeout=60,
         stdin=subprocess.DEVNULL,
     )

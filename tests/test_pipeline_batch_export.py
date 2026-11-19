@@ -137,3 +137,31 @@ def test_batch_rejects_file_as_export_directory_before_render(fake_exports):
         )
     assert calls == []
     assert target.read_text() == "preserve"
+
+
+def test_batch_rejects_symlink_parent_before_render(fake_exports):
+    calls, folder = fake_exports
+    real_parent = folder / "real-parent"
+    real_parent.mkdir()
+    alias_parent = folder / "alias-parent"
+    alias_parent.symlink_to(real_parent, target_is_directory=True)
+    destination = alias_parent / "new-clips"
+    with pytest.raises(ValueError, match="symlink"):
+        pipeline.create_local_clip_batch(
+            "authorized.mp4", destination, [{"start": 0, "end": 10}],
+            authorized=True,
+        )
+    assert calls == []
+    assert not (real_parent / "new-clips").exists()
+
+
+def test_batch_allows_regular_nested_output_directory(fake_exports):
+    calls, folder = fake_exports
+    destination = folder / "regular-parent" / "new-clips"
+    result = pipeline.create_local_clip_batch(
+        "authorized.mp4", destination, [{"start": 0, "end": 10}],
+        authorized=True,
+    )
+    assert calls == [(0, 10)]
+    assert len(result["clips"]) == 1
+    assert (destination / "clip-01.mp4").exists()

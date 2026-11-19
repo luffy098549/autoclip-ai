@@ -160,3 +160,16 @@ def test_clip_range_rejects_missing_duration():
 def test_clip_range_rejects_boolean_values(metadata, start, end, limit):
     with pytest.raises(ValueError, match="Invalid clip range"):
         validate_clip_range(metadata, start, end, max_duration_seconds=limit)
+
+
+def test_preview_probe_disallows_remote_protocols(tmp_path):
+    source = tmp_path / "authorized.mp4"
+    source.write_bytes(b"synthetic")
+    payload = {"streams": [{"codec_type": "video", "width": 320,
+                            "height": 180}], "format": {"duration": "12"}}
+    with patch("app.media_probe.subprocess.run") as run:
+        run.return_value.stdout = json.dumps(payload)
+        assert inspect_local_video(source)["duration_seconds"] == 12
+        args = run.call_args.args[0]
+        assert args[args.index("-protocol_whitelist") + 1] == "file"
+        assert run.call_args.kwargs["stdin"] is subprocess.DEVNULL

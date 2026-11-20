@@ -350,3 +350,37 @@ def test_render_marks_ready_when_rights_remain_valid(portal, monkeypatch):
         saved = db.session.get(Clip, clip_id)
         assert saved.editorial_status == "ready"
         assert saved.output_path == target
+
+
+def test_failed_retry_clears_previous_output_path(portal, monkeypatch):
+    app, _, source_id, root = portal
+    with app.app_context():
+        clip = Clip(source_id=source_id, start_seconds=0, end_seconds=5,
+                    editorial_status="failed", output_path=str(root / "clips" / "old.mp4"))
+        db.session.add(clip)
+        db.session.commit()
+        clip_id = clip.id
+
+        def fail_render(*args, **kwargs):
+            raise RuntimeError("encoder unavailable")
+
+        monkeypatch.setattr("app.services.clip_processor.create_local_clip", fail_render)
+        from app.services.clip_processor import process_clip
+        with pytest.raises(RuntimeError, match="encoder unavailable"):
+            process_clip(clip_id)
+        db.session.expire_all()
+        stored = db.session.get(Clip, clip_id)
+        assert stored.editorial_status == "failed"
+        assert stored.output_path is None
+
+
+def test_read_only_deployment_rejects_media_import(portal):
+    app, client, _, root = portal
+    app.config["READ_ONLY_DEPLOYMENT"] = True
+    response = client.post("/api/sources", data={
+        "rights": "owned", "evidence": "Recorded by test operator",
+    })
+    assert response.status_code == 503
+    with app.app_context():
+        assert MediaSource.query.count() == 1
+    assert not (root / "imports").exists()

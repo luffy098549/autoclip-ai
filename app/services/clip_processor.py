@@ -10,11 +10,8 @@ def process_clip(clip_id: int):
     clip = db.session.get(Clip, clip_id)
     if clip is None:
         raise ValueError("Clip no encontrado")
-    source = db.session.get(MediaSource, clip.source_id)
-    if source is None or not assess_rights(source.rights_status, source.permission_evidence).allowed:
-        clip.editorial_status = "rejected"
-        db.session.commit()
-        raise PermissionError("La fuente no tiene autorización válida")
+    # Claim before touching editorial state: a stale worker must not reject a
+    # clip that another worker is already processing or has completed.
     # Claim atomically to prevent concurrent workers overwriting one output.
     claimed = db.session.query(Clip).filter(
         Clip.id == clip_id,
@@ -24,6 +21,12 @@ def process_clip(clip_id: int):
     if claimed != 1:
         raise RuntimeError("Clip already processing or not eligible for rendering")
     db.session.refresh(clip)
+    source = db.session.get(MediaSource, clip.source_id)
+    if source is None or not assess_rights(source.rights_status, source.permission_evidence).allowed:
+        clip.output_path = None
+        clip.editorial_status = "rejected"
+        db.session.commit()
+        raise PermissionError("La fuente no tiene autorización válida")
     target = Path(current_app.config["MEDIA_ROOT"]) / "clips" / f"clip-{clip.id}.mp4"
     try:
         info = create_local_clip(source.source_uri, target, start=clip.start_seconds,

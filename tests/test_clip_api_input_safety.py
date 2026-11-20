@@ -298,3 +298,55 @@ def test_render_claim_moves_pending_clip_to_processing_before_encoding(portal, m
             process_clip(clip_id)
         db.session.expire_all()
         assert db.session.get(Clip, clip_id).editorial_status == "failed"
+
+
+def test_render_does_not_mark_ready_if_rights_revoked_during_encoding(portal, monkeypatch):
+    app, _, source_id, root = portal
+    with app.app_context():
+        clip = Clip(source_id=source_id, start_seconds=0, end_seconds=5,
+                    editorial_status="draft")
+        db.session.add(clip)
+        db.session.commit()
+        clip_id = clip.id
+
+        def revoke_during_encoding(*args, **kwargs):
+            # Separate session simulates an external authorization update.
+            from sqlalchemy.orm import Session
+            with Session(db.engine) as other:
+                source = other.get(MediaSource, source_id)
+                source.rights_status = "unverified"
+                source.permission_evidence = ""
+                other.commit()
+            return {"path": str(root / "clips" / f"clip-{clip_id}.mp4")}
+
+        monkeypatch.setattr("app.services.clip_processor.create_local_clip",
+                            revoke_during_encoding)
+        monkeypatch.setattr("app.services.subtitle_export.export_clip_srt",
+                            lambda *args, **kwargs: None)
+        from app.services.clip_processor import process_clip
+        with pytest.raises(PermissionError, match="revoked"):
+            process_clip(clip_id)
+        db.session.expire_all()
+        assert db.session.get(Clip, clip_id).editorial_status == "failed"
+        assert db.session.get(Clip, clip_id).output_path is None
+
+
+def test_render_marks_ready_when_rights_remain_valid(portal, monkeypatch):
+    app, _, source_id, root = portal
+    with app.app_context():
+        clip = Clip(source_id=source_id, start_seconds=0, end_seconds=5,
+                    editorial_status="draft")
+        db.session.add(clip)
+        db.session.commit()
+        clip_id = clip.id
+        target = str(root / "clips" / f"clip-{clip_id}.mp4")
+        monkeypatch.setattr("app.services.clip_processor.create_local_clip",
+                            lambda *args, **kwargs: {"path": target})
+        monkeypatch.setattr("app.services.subtitle_export.export_clip_srt",
+                            lambda *args, **kwargs: None)
+        from app.services.clip_processor import process_clip
+        process_clip(clip_id)
+        db.session.expire_all()
+        saved = db.session.get(Clip, clip_id)
+        assert saved.editorial_status == "ready"
+        assert saved.output_path == target

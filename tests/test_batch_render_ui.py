@@ -85,3 +85,13 @@ def test_library_clears_transferred_ids_when_refresh_revokes_eligibility():
     assert 'La selección cambió.' in library
     # The batch API is only called by the explicit form submission.
     assert '/api/clips/render-batch' not in library
+
+
+def test_library_checkbox_changes_invalidate_prepared_batch():
+    library = (Path(__file__).resolve().parents[1] / "app/static/js/library.js").read_text(encoding="utf-8")
+    assert "function invalidateTransferredSelection()" in library
+    assert 'if (batchInput.value === transferredSelection)' in library
+    assert 'batchInput.value = "";' in library
+    assert 'transferredSelection = "";' in library
+    assert "invalidateTransferredSelection();\n          updateSelection();" in library
+    assert '/api/clips/render-batch' not in library

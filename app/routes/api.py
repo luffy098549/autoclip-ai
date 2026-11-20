@@ -82,6 +82,8 @@ def sources():
             "id": x.id, "streamer_id": x.streamer_id, "rights": x.rights_status,
             "name": Path(x.source_uri).name, "created_at": x.acquired_at.isoformat()
         } for x in items])
+    if current_app.config.get("READ_ONLY_DEPLOYMENT", False):
+        return jsonify(error="La importación está desactivada en modo solo lectura"), 503
     file = request.files.get("file")
     if file is None or not file.filename:
         return jsonify(error="Selecciona un archivo de video"), 400

@@ -230,3 +230,28 @@ def test_ready_subtitles_are_advertised_and_downloadable(portal):
     response = client.get(f"/api/clips/{clip_id}/subtitles")
     assert response.status_code == 200
     assert b"Current caption" in response.data
+
+
+def test_catalog_hides_subtitles_after_source_rights_revoked(portal):
+    app, client, source_id, root = portal
+    with app.app_context():
+        clip = Clip(source_id=source_id, start_seconds=0, end_seconds=5,
+                    editorial_status="ready")
+        db.session.add(clip)
+        db.session.commit()
+        clip_id = clip.id
+    subtitles = root / "subtitles"
+    subtitles.mkdir(exist_ok=True)
+    (subtitles / f"clip-{clip_id}.srt").write_text("Authorized caption", encoding="utf-8")
+    before = client.get("/api/clips")
+    assert before.status_code == 200
+    assert next(x for x in before.json["items"] if x["id"] == clip_id)["has_subtitles"] is True
+    with app.app_context():
+        source = db.session.get(MediaSource, source_id)
+        source.rights_status = "unverified"
+        source.permission_evidence = ""
+        db.session.commit()
+    after = client.get("/api/clips")
+    assert after.status_code == 200
+    assert next(x for x in after.json["items"] if x["id"] == clip_id)["has_subtitles"] is False
+    assert client.get(f"/api/clips/{clip_id}/subtitles").status_code == 403

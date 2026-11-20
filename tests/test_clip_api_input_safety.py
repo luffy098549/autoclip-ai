@@ -431,3 +431,37 @@ def test_revoked_pending_source_is_rejected_without_encoding(portal, monkeypatch
         stored = db.session.get(Clip, clip_id)
         assert stored.editorial_status == "rejected"
         assert stored.output_path is None
+
+
+def test_failed_render_removes_generated_artifacts(portal, monkeypatch):
+    app, _, source_id, root = portal
+    with app.app_context():
+        clip = Clip(source_id=source_id, start_seconds=0, end_seconds=5,
+                    editorial_status="draft")
+        db.session.add(clip)
+        db.session.commit()
+        clip_id = clip.id
+        target = root / "clips" / f"clip-{clip_id}.mp4"
+        captioned = root / "clips" / f"clip-{clip_id}-captioned.mp4"
+        subtitles = root / "subtitles" / f"clip-{clip_id}.srt"
+        unrelated = root / "clips" / "other.mp4"
+        target.parent.mkdir(parents=True)
+        subtitles.parent.mkdir(parents=True)
+        for artifact in (target, captioned, subtitles, unrelated):
+            artifact.write_bytes(b"synthetic test artifact")
+
+        def fail_encoder(*args, **kwargs):
+            raise RuntimeError("simulated render failure")
+
+        monkeypatch.setattr("app.services.clip_processor.create_local_clip", fail_encoder)
+        from app.services.clip_processor import process_clip
+        with pytest.raises(RuntimeError, match="simulated render failure"):
+            process_clip(clip_id)
+        assert not target.exists()
+        assert not captioned.exists()
+        assert not subtitles.exists()
+        assert unrelated.read_bytes() == b"synthetic test artifact"
+        db.session.expire_all()
+        saved = db.session.get(Clip, clip_id)
+        assert saved.editorial_status == "failed"
+        assert saved.output_path is None

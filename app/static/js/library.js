@@ -153,7 +153,13 @@ document.addEventListener("DOMContentLoaded",()=>{
       const data=await response.json();
       // An older response must not overwrite newer clip statuses or selections.
       if (sequence !== reloadSequence) return;
-      if (!data || !Array.isArray(data.items)) throw new Error("Respuesta inválida de la biblioteca");
+      if (!data || !Array.isArray(data.items) || !data.items.every(item =>
+        item && Number.isSafeInteger(item.id) && item.id > 0 &&
+        Number.isSafeInteger(item.source_id) && item.source_id > 0 &&
+        typeof item.status === "string" &&
+        Number.isFinite(item.start) && Number.isFinite(item.end) &&
+        item.end > item.start
+      )) throw new Error("Respuesta inválida de la biblioteca");
       clips=data.items;
       render();
     } catch (error) {

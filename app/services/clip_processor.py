@@ -49,6 +49,8 @@ def process_clip(clip_id: int):
     except Exception:
         db.session.rollback()
         clip = db.session.get(Clip, clip_id)
+        # A failed retry must never retain a previously rendered download path.
+        clip.output_path = None
         clip.editorial_status = "failed"
         db.session.commit()
         raise

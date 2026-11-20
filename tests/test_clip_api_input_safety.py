@@ -255,3 +255,46 @@ def test_catalog_hides_subtitles_after_source_rights_revoked(portal):
     assert after.status_code == 200
     assert next(x for x in after.json["items"] if x["id"] == clip_id)["has_subtitles"] is False
     assert client.get(f"/api/clips/{clip_id}/subtitles").status_code == 403
+
+
+@pytest.mark.parametrize("status", ["processing", "ready", "rejected"])
+def test_render_claim_refuses_non_pending_clip_without_encoding(portal, monkeypatch, status):
+    app, _, source_id, _ = portal
+    with app.app_context():
+        clip = Clip(source_id=source_id, start_seconds=0, end_seconds=5,
+                    editorial_status=status)
+        db.session.add(clip)
+        db.session.commit()
+        clip_id = clip.id
+
+        def should_not_encode(*args, **kwargs):
+            pytest.fail("Ineligible clip was encoded")
+
+        monkeypatch.setattr("app.services.clip_processor.create_local_clip", should_not_encode)
+        from app.services.clip_processor import process_clip
+        with pytest.raises(RuntimeError, match="not eligible"):
+            process_clip(clip_id)
+        db.session.expire_all()
+        assert db.session.get(Clip, clip_id).editorial_status == status
+
+
+def test_render_claim_moves_pending_clip_to_processing_before_encoding(portal, monkeypatch):
+    app, _, source_id, _ = portal
+    with app.app_context():
+        clip = Clip(source_id=source_id, start_seconds=0, end_seconds=5,
+                    editorial_status="awaiting_worker")
+        db.session.add(clip)
+        db.session.commit()
+        clip_id = clip.id
+
+        def inspect_claim(*args, **kwargs):
+            db.session.expire_all()
+            assert db.session.get(Clip, clip_id).editorial_status == "processing"
+            raise RuntimeError("simulated encoder failure")
+
+        monkeypatch.setattr("app.services.clip_processor.create_local_clip", inspect_claim)
+        from app.services.clip_processor import process_clip
+        with pytest.raises(RuntimeError, match="simulated encoder failure"):
+            process_clip(clip_id)
+        db.session.expire_all()
+        assert db.session.get(Clip, clip_id).editorial_status == "failed"

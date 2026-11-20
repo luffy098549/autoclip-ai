@@ -133,7 +133,7 @@ def clips():
         return jsonify(items=[{
             "id": c.id, "source_id": c.source_id, "start": c.start_seconds,
             "end": c.end_seconds, "status": c.editorial_status, "score": c.score,
-            "has_subtitles": (c.editorial_status == "ready" and
+            "has_subtitles": (c.editorial_status == "ready" and c.source_id in authorized_sources and
                               (Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{c.id}.srt").is_file())
         } for c in items])
     data = request.get_json(silent=True)

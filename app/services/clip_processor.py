@@ -21,15 +21,22 @@ def process_clip(clip_id: int):
     if claimed != 1:
         raise RuntimeError("Clip already processing or not eligible for rendering")
     db.session.refresh(clip)
+    target = Path(current_app.config["MEDIA_ROOT"]) / "clips" / f"clip-{clip.id}.mp4"
+    subtitles = Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{clip.id}.srt"
+    captioned = target.with_name(f"clip-{clip.id}-captioned.mp4")
     source = db.session.get(MediaSource, clip.source_id)
     if source is None or not assess_rights(source.rights_status, source.permission_evidence).allowed:
+        # A revoked source must not leave stale artifacts from an earlier
+        # attempt accessible by direct file paths. Only delete clip-owned paths.
+        for artifact in (target, captioned, subtitles):
+            try:
+                artifact.unlink(missing_ok=True)
+            except OSError:
+                current_app.logger.warning("Could not remove rejected clip artifact: %s", artifact.name)
         clip.output_path = None
         clip.editorial_status = "rejected"
         db.session.commit()
         raise PermissionError("La fuente no tiene autorización válida")
-    target = Path(current_app.config["MEDIA_ROOT"]) / "clips" / f"clip-{clip.id}.mp4"
-    subtitles = Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{clip.id}.srt"
-    captioned = target.with_name(f"clip-{clip.id}-captioned.mp4")
     try:
         # A retry must not reuse artifacts left by an earlier attempt. In
         # particular, a successful render without captions must not expose an

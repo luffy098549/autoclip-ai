@@ -118,3 +118,70 @@ def test_transcript_allows_owned_source(portal):
     response = client.get(f"/api/sources/{source_id}/transcript")
     assert response.status_code == 200
     assert response.json["segments"] == []
+
+
+@pytest.mark.parametrize("payload", [
+    None, {}, {"clip_ids": []}, {"clip_ids": [1, 1]},
+    {"clip_ids": [True]}, {"clip_ids": ["1"]},
+    {"clip_ids": [0]}, {"clip_ids": [1, 2, 3, 4, 5, 6]},
+])
+def test_batch_endpoint_rejects_invalid_ids(portal, payload):
+    app, client, _, _ = portal
+    app.config["PROCESSING_ENABLED"] = True
+    response = client.post("/api/clips/render-batch", json=payload)
+    assert response.status_code == 400
+
+
+def test_batch_endpoint_requires_enabled_processing(portal):
+    _, client, _, _ = portal
+    assert client.post("/api/clips/render-batch", json={"clip_ids": [1]}).status_code == 503
+
+
+def test_batch_endpoint_queues_authorized_pending_clips(portal, monkeypatch):
+    app, client, source_id, _ = portal
+    with app.app_context():
+        clip = Clip(source_id=source_id, start_seconds=0, end_seconds=5,
+                    editorial_status="awaiting_worker")
+        db.session.add(clip)
+        db.session.commit()
+        clip_id = clip.id
+    app.config["PROCESSING_ENABLED"] = True
+    queued = []
+    from app.tasks import render_clip_batch_task
+    monkeypatch.setattr(render_clip_batch_task, "delay",
+                        lambda ids: (queued.append(ids) or type("Task", (), {"id": "test-job"})()))
+    response = client.post("/api/clips/render-batch", json={"clip_ids": [clip_id]})
+    assert response.status_code == 202
+    assert response.json["task_id"] == "test-job"
+    assert queued == [[clip_id]]
+
+
+def test_batch_endpoint_rejects_revoked_rights_before_enqueue(portal, monkeypatch):
+    app, client, source_id, _ = portal
+    with app.app_context():
+        clip = Clip(source_id=source_id, start_seconds=0, end_seconds=5,
+                    editorial_status="draft")
+        db.session.add(clip)
+        source = db.session.get(MediaSource, source_id)
+        source.rights_status = "unverified"
+        db.session.commit()
+        clip_id = clip.id
+    app.config["PROCESSING_ENABLED"] = True
+    from app.tasks import render_clip_batch_task
+    monkeypatch.setattr(render_clip_batch_task, "delay",
+                        lambda ids: pytest.fail("Unauthorized clip was queued"))
+    assert client.post("/api/clips/render-batch",
+                       json={"clip_ids": [clip_id]}).status_code == 403
+
+
+def test_batch_endpoint_rejects_protected_status(portal):
+    app, client, source_id, _ = portal
+    with app.app_context():
+        clip = Clip(source_id=source_id, start_seconds=0, end_seconds=5,
+                    editorial_status="ready")
+        db.session.add(clip)
+        db.session.commit()
+        clip_id = clip.id
+    app.config["PROCESSING_ENABLED"] = True
+    assert client.post("/api/clips/render-batch",
+                       json={"clip_ids": [clip_id]}).status_code == 409

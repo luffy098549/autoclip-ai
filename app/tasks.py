@@ -16,7 +16,7 @@ def heartbeat():
 
 def _require_positive_id(value, label):
     """Reject malformed task identifiers before opening app/database resources."""
-    if type(value) is not int or value <= 0:
+    if type(value) is not int or not 0 < value <= (2**63 - 1):
         raise ValueError(f"{label} must be a positive integer")
     return value
 
@@ -97,7 +97,7 @@ def render_clip_batch_task(clip_ids):
     """
     if not isinstance(clip_ids, (list, tuple)) or not 1 <= len(clip_ids) <= 5:
         raise ValueError("Provide between one and five clip IDs")
-    if any(type(clip_id) is not int or clip_id <= 0 for clip_id in clip_ids):
+    if any(type(clip_id) is not int or not 0 < clip_id <= (2**63 - 1) for clip_id in clip_ids):
         raise ValueError("Clip IDs must be positive integers")
     if len(set(clip_ids)) != len(clip_ids):
         raise ValueError("Duplicate clip IDs")

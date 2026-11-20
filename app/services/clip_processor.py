@@ -38,6 +38,11 @@ def process_clip(clip_id: int):
             burn_subtitles(info["path"], subtitle_path, captioned)
             clip.output_path = str(captioned)
             info["captioned_path"] = str(captioned)
+        # Authorization can be revoked while FFmpeg is running. Reload the
+        # source from the database before exposing a completed render.
+        db.session.expire(source)
+        if not assess_rights(source.rights_status, source.permission_evidence).allowed:
+            raise PermissionError("Source authorization revoked during rendering")
         clip.editorial_status = "ready"
         db.session.commit()
         return info

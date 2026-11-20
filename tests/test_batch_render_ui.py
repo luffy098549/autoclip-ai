@@ -74,3 +74,14 @@ def test_library_batch_selection_is_manual_limited_and_state_gated():
     assert 'fetch("/api/clips"' in library
     assert '/api/clips/render-batch' not in library
     assert '/publish' not in library
+
+
+def test_library_clears_transferred_ids_when_refresh_revokes_eligibility():
+    library = (Path(__file__).resolve().parents[1] / "app/static/js/library.js").read_text(encoding="utf-8")
+    assert 'let transferredSelection = "";' in library
+    assert 'transferredSelection = batchInput.value;' in library
+    assert 'transferredIds.some(id => !validIds.has(id))' in library
+    assert 'batchInput.value = "";' in library
+    assert 'La selección cambió.' in library
+    # The batch API is only called by the explicit form submission.
+    assert '/api/clips/render-batch' not in library

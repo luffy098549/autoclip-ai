@@ -86,7 +86,7 @@ def test_batch_allows_explicit_retry_of_failed_clips(monkeypatch, batch_context)
     monkeypatch.setattr(clip_processor, "process_clip", lambda clip_id: seen.append(clip_id))
     result = render_clip_batch_task([2])
     assert result == {
-        "rendered_clip_ids": [2], "failed_clip_ids": [], "skipped_clip_ids": []
+        "rendered_clip_ids": [2], "failed_clip_ids": [], "skipped_clip_ids": [], "unauthorized_clip_ids": []
     }
     assert seen == [2]
 
@@ -165,3 +165,38 @@ def test_batch_rejects_unauthorized_source_without_rendering(monkeypatch, batch_
     assert result["rendered_clip_ids"] == []
     assert result["failed_clip_ids"] == []
     assert rollbacks == []
+
+
+def test_batch_missing_source_is_unauthorized_and_other_clips_continue(monkeypatch, batch_context):
+    from app.models import MediaSource
+    _, seen, _ = batch_context
+    original_get = db.session.get
+    monkeypatch.setattr(db.session, "get", lambda model, identifier: (
+        None if model is MediaSource and identifier == 10 else original_get(model, identifier)
+    ))
+    monkeypatch.setattr(clip_processor, "process_clip", lambda clip_id: seen.append(clip_id))
+    result = render_clip_batch_task([1, 2])
+    assert seen == []
+    assert result["unauthorized_clip_ids"] == [1, 2]
+    assert result["rendered_clip_ids"] == []
+
+
+def test_batch_mixed_rights_keeps_authorized_rendering(monkeypatch, batch_context):
+    from app.models import Clip, MediaSource
+    _, seen, _ = batch_context
+    original_get = db.session.get
+    monkeypatch.setattr(db.session, "get", lambda model, identifier: (
+        SimpleNamespace(editorial_status="draft", source_id=identifier + 100)
+        if model is Clip else
+        SimpleNamespace(rights_status="unverified", permission_evidence=None)
+        if model is MediaSource and identifier == 102 else
+        SimpleNamespace(rights_status="owned", permission_evidence="test-owned-video")
+        if model is MediaSource else original_get(model, identifier)
+    ))
+    monkeypatch.setattr(clip_processor, "process_clip", lambda clip_id: seen.append(clip_id))
+    result = render_clip_batch_task([1, 2, 3])
+    assert seen == [1, 3]
+    assert result == {
+        "rendered_clip_ids": [1, 3], "failed_clip_ids": [],
+        "skipped_clip_ids": [], "unauthorized_clip_ids": [2],
+    }

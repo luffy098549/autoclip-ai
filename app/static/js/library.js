@@ -21,6 +21,15 @@ document.addEventListener("DOMContentLoaded",()=>{
   transferButton.textContent = "Enviar selección al formulario";
   selectionBar.append(selectionStatus, transferButton);
   if (batchInput) gallery.before(selectionBar);
+  function invalidateTransferredSelection() {
+    if (!batchInput || !transferredSelection) return;
+    // A changed checkbox selection must never leave a stale batch ready to submit.
+    if (batchInput.value === transferredSelection) {
+      batchInput.value = "";
+      if (batchFeedback) batchFeedback.textContent = "La selección cambió. Transfiere de nuevo los clips antes de procesar.";
+    }
+    transferredSelection = "";
+  }
   function updateSelection() {
     selectionStatus.textContent = selectedForBatch.size + " de 5 clips seleccionados";
     transferButton.disabled = selectedForBatch.size === 0;
@@ -124,6 +133,7 @@ document.addEventListener("DOMContentLoaded",()=>{
           }
           if (checkbox.checked) selectedForBatch.add(item.id);
           else selectedForBatch.delete(item.id);
+          invalidateTransferredSelection();
           updateSelection();
         });
         label.append(checkbox, document.createTextNode(" Seleccionar para lote"));

@@ -108,7 +108,7 @@ def render_clip_batch_task(clip_ids):
                 clip = db.session.get(Clip, clip_id)
                 # Never overwrite an already approved/published clip, or race
                 # another worker currently processing the same record.
-                if clip is None or clip.editorial_status not in {"draft", "failed"}:
+                if clip is None or clip.editorial_status not in {"draft", "failed", "awaiting_worker"}:
                     skipped.append(clip_id)
                     continue
                 source = db.session.get(MediaSource, clip.source_id)

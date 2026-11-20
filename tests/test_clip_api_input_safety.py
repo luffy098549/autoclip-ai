@@ -526,3 +526,45 @@ def test_retry_cleanup_failure_prevents_encoding(portal, monkeypatch):
         saved = db.session.get(Clip, clip_id)
         assert saved.editorial_status == "failed"
         assert saved.output_path is None
+
+
+@pytest.mark.parametrize("status", ["queued", "awaiting_worker", "draft", "failed"])
+def test_batch_worker_processes_eligible_clip_states(portal, monkeypatch, status):
+    app, _, source_id, _ = portal
+    with app.app_context():
+        clip = Clip(source_id=source_id, start_seconds=0, end_seconds=5,
+                    editorial_status=status)
+        db.session.add(clip)
+        db.session.commit()
+        clip_id = clip.id
+
+    monkeypatch.setattr("app.create_app", lambda *args, **kwargs: app)
+    calls = []
+    monkeypatch.setattr("app.services.clip_processor.process_clip",
+                        lambda clip_id: calls.append(clip_id))
+    from app.tasks import render_clip_batch_task
+    result = render_clip_batch_task.run([clip_id])
+    assert calls == [clip_id]
+    assert result["rendered_clip_ids"] == [clip_id]
+    assert result["skipped_clip_ids"] == []
+
+
+def test_batch_worker_does_not_process_queued_clip_after_rights_revocation(portal, monkeypatch):
+    app, _, source_id, _ = portal
+    with app.app_context():
+        clip = Clip(source_id=source_id, start_seconds=0, end_seconds=5,
+                    editorial_status="queued")
+        db.session.add(clip)
+        source = db.session.get(MediaSource, source_id)
+        source.rights_status = "unverified"
+        source.permission_evidence = ""
+        db.session.commit()
+        clip_id = clip.id
+
+    monkeypatch.setattr("app.create_app", lambda *args, **kwargs: app)
+    monkeypatch.setattr("app.services.clip_processor.process_clip",
+                        lambda clip_id: pytest.fail("Unauthorized clip rendered"))
+    from app.tasks import render_clip_batch_task
+    result = render_clip_batch_task.run([clip_id])
+    assert result["unauthorized_clip_ids"] == [clip_id]
+    assert result["rendered_clip_ids"] == []

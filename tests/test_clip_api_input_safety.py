@@ -185,3 +185,48 @@ def test_batch_endpoint_rejects_protected_status(portal):
     app.config["PROCESSING_ENABLED"] = True
     assert client.post("/api/clips/render-batch",
                        json={"clip_ids": [clip_id]}).status_code == 409
+
+
+
+@pytest.mark.parametrize("status", ["draft", "failed", "awaiting_worker", "queued", "processing"])
+def test_stale_subtitles_are_not_downloadable_or_advertised(portal, status):
+    app, client, source_id, root = portal
+    with app.app_context():
+        clip = Clip(source_id=source_id, start_seconds=0, end_seconds=5,
+                    editorial_status=status)
+        db.session.add(clip)
+        db.session.commit()
+        clip_id = clip.id
+    subtitles = root / "subtitles"
+    subtitles.mkdir(exist_ok=True)
+    (subtitles / f"clip-{clip_id}.srt").write_text(
+        "1\n00:00:00,000 --> 00:00:01,000\nOld caption\n", encoding="utf-8"
+    )
+    response = client.get(f"/api/clips/{clip_id}/subtitles")
+    assert response.status_code == 404
+    assert b"Old caption" not in response.data
+    catalog = client.get("/api/clips")
+    assert catalog.status_code == 200
+    item = next(item for item in catalog.json["items"] if item["id"] == clip_id)
+    assert item["has_subtitles"] is False
+
+
+def test_ready_subtitles_are_advertised_and_downloadable(portal):
+    app, client, source_id, root = portal
+    with app.app_context():
+        clip = Clip(source_id=source_id, start_seconds=0, end_seconds=5,
+                    editorial_status="ready")
+        db.session.add(clip)
+        db.session.commit()
+        clip_id = clip.id
+    subtitles = root / "subtitles"
+    subtitles.mkdir(exist_ok=True)
+    (subtitles / f"clip-{clip_id}.srt").write_text(
+        "1\n00:00:00,000 --> 00:00:01,000\nCurrent caption\n", encoding="utf-8"
+    )
+    catalog = client.get("/api/clips")
+    item = next(item for item in catalog.json["items"] if item["id"] == clip_id)
+    assert item["has_subtitles"] is True
+    response = client.get(f"/api/clips/{clip_id}/subtitles")
+    assert response.status_code == 200
+    assert b"Current caption" in response.data

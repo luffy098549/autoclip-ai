@@ -1,0 +1,38 @@
+"""Smoke tests for the batch render controls in the owner-only library."""
+from pathlib import Path
+
+from werkzeug.security import generate_password_hash
+
+from app import create_app
+
+
+def test_batch_render_controls_visible_only_after_login(tmp_path):
+    app = create_app({
+        "TESTING": True,
+        "WTF_CSRF_ENABLED": False,
+        "SQLALCHEMY_DATABASE_URI": "sqlite://",
+        "SECRET_KEY": "batch-ui-test-secret",
+        "ADMIN_PASSWORD_HASH": generate_password_hash("long-test-password"),
+        "MEDIA_ROOT": str(tmp_path),
+    })
+    client = app.test_client()
+    anonymous = client.get("/clips")
+    assert anonymous.status_code == 200
+    assert b'batch-render-form' not in anonymous.data
+
+    assert client.post("/login", data={"password": "long-test-password"}).status_code == 302
+    authenticated = client.get("/clips")
+    assert authenticated.status_code == 200
+    assert b'id="batch-render-form"' in authenticated.data
+    assert b'id="batch-render-feedback"' in authenticated.data
+    assert b'js/batch-render.js' in authenticated.data
+
+
+def test_batch_render_script_exists_and_uses_manual_queue_only():
+    script = Path(__file__).resolve().parents[1] / "app/static/js/batch-render.js"
+    content = script.read_text(encoding="utf-8")
+    assert "/api/clips/render-batch" in content
+    assert "/api/jobs/" in content
+    assert 'method: "POST"' in content
+    assert "textContent" in content
+    assert "/publish" not in content

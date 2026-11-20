@@ -14,8 +14,16 @@ def heartbeat():
     return {"service": "autoclip", "status": "alive"}
 
 
+def _require_positive_id(value, label):
+    """Reject malformed task identifiers before opening app/database resources."""
+    if type(value) is not int or value <= 0:
+        raise ValueError(f"{label} must be a positive integer")
+    return value
+
+
 @celery_app.task(name="autoclip.render_clip_task")
 def render_clip_task(clip_id: int):
+    _require_positive_id(clip_id, "Clip ID")
     from . import create_app
     from .services.clip_processor import process_clip
     app = create_app()
@@ -25,6 +33,7 @@ def render_clip_task(clip_id: int):
 
 @celery_app.task(name="autoclip.analyze_source_task")
 def analyze_source_task(source_id: int):
+    _require_positive_id(source_id, "Source ID")
     from . import create_app
     from .services.analyzer import analyze_source
     app = create_app()
@@ -67,6 +76,7 @@ def analyze_source_task(source_id: int):
 
 @celery_app.task(name="autoclip.youtube_metadata_task")
 def youtube_metadata_task(streamer_id: int):
+    _require_positive_id(streamer_id, "Streamer ID")
     import os
     from . import create_app
     from .services.competitor_sync import sync_youtube_channel

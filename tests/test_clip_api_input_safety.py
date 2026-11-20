@@ -465,3 +465,64 @@ def test_failed_render_removes_generated_artifacts(portal, monkeypatch):
         saved = db.session.get(Clip, clip_id)
         assert saved.editorial_status == "failed"
         assert saved.output_path is None
+
+
+def test_successful_retry_removes_stale_caption_artifacts(portal, monkeypatch):
+    app, _, source_id, root = portal
+    with app.app_context():
+        clip = Clip(source_id=source_id, start_seconds=0, end_seconds=5,
+                    editorial_status="failed")
+        db.session.add(clip)
+        db.session.commit()
+        clip_id = clip.id
+        target = root / "clips" / f"clip-{clip_id}.mp4"
+        captioned = root / "clips" / f"clip-{clip_id}-captioned.mp4"
+        subtitles = root / "subtitles" / f"clip-{clip_id}.srt"
+        unrelated = root / "clips" / "unrelated.mp4"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        subtitles.parent.mkdir(parents=True, exist_ok=True)
+        for artifact in (target, captioned, subtitles, unrelated):
+            artifact.write_bytes(b"old artifact")
+
+        def render(*args, **kwargs):
+            assert not target.exists()
+            assert not captioned.exists()
+            assert not subtitles.exists()
+            target.write_bytes(b"new artifact")
+            return {"path": str(target)}
+
+        monkeypatch.setattr("app.services.clip_processor.create_local_clip", render)
+        monkeypatch.setattr("app.services.subtitle_export.export_clip_srt",
+                            lambda *args, **kwargs: None)
+        from app.services.clip_processor import process_clip
+        process_clip(clip_id)
+        db.session.expire_all()
+        saved = db.session.get(Clip, clip_id)
+        assert saved.editorial_status == "ready"
+        assert saved.output_path == str(target)
+        assert target.read_bytes() == b"new artifact"
+        assert not captioned.exists()
+        assert not subtitles.exists()
+        assert unrelated.read_bytes() == b"old artifact"
+
+
+def test_retry_cleanup_failure_prevents_encoding(portal, monkeypatch):
+    app, _, source_id, root = portal
+    with app.app_context():
+        clip = Clip(source_id=source_id, start_seconds=0, end_seconds=5,
+                    editorial_status="failed")
+        db.session.add(clip)
+        db.session.commit()
+        clip_id = clip.id
+        target = root / "clips" / f"clip-{clip_id}.mp4"
+        target.mkdir(parents=True)
+
+        monkeypatch.setattr("app.services.clip_processor.create_local_clip",
+                            lambda *args, **kwargs: pytest.fail("encoder must not run"))
+        from app.services.clip_processor import process_clip
+        with pytest.raises(IsADirectoryError):
+            process_clip(clip_id)
+        db.session.expire_all()
+        saved = db.session.get(Clip, clip_id)
+        assert saved.editorial_status == "failed"
+        assert saved.output_path is None

@@ -53,3 +53,11 @@ def test_batch_render_ui_reports_authorization_rejections_and_terminal_states():
     assert 'payload.state === "FAILURE"' in content
     assert 'payload.state === "REVOKED"' in content
     assert 'Array.isArray(result.failed_clip_ids)' in content
+
+
+def test_successful_batch_refreshes_library_without_publishing():
+    content = (Path(__file__).resolve().parents[1] / "app/static/js/batch-render.js").read_text(encoding="utf-8")
+    assert 'document.getElementById("library-refresh")' in content
+    assert 'if (payload.state === "SUCCESS") refreshLibrary();' in content
+    assert 'if (refresh) refresh.click();' in content
+    assert "/publish" not in content

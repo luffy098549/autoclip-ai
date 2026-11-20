@@ -6,6 +6,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   const filter=document.getElementById("library-filter");
   const count=document.getElementById("library-count");
   let clips=[];
+  let reloadSequence = 0;
   const selectedForBatch = new Set();
   let transferredSelection = "";
   const batchInput = document.getElementById("batch-render-ids");
@@ -145,11 +146,20 @@ document.addEventListener("DOMContentLoaded",()=>{
   }
 
   async function reload(){
-    const response=await fetch("/api/clips",{credentials:"same-origin"});
-    if(!response.ok)throw new Error("No se pudo cargar la biblioteca");
-    const data=await response.json();
-    clips=data.items||[];
-    render();
+    const sequence = ++reloadSequence;
+    try {
+      const response=await fetch("/api/clips",{credentials:"same-origin"});
+      if(!response.ok)throw new Error("No se pudo cargar la biblioteca");
+      const data=await response.json();
+      // An older response must not overwrite newer clip statuses or selections.
+      if (sequence !== reloadSequence) return;
+      if (!data || !Array.isArray(data.items)) throw new Error("Respuesta inválida de la biblioteca");
+      clips=data.items;
+      render();
+    } catch (error) {
+      if (sequence !== reloadSequence) return;
+      throw error;
+    }
   }
   search.addEventListener("input",render);
   filter.addEventListener("change",render);

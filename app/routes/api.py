@@ -179,6 +179,43 @@ def clips():
                    message="Solicitud de recorte registrada. Comprueba el estado en Biblioteca."), 202
 
 
+@api_bp.post("/clips/render-batch")
+@admin_only
+def queue_clip_batch():
+    """Queue up to five authorized, pending clips for manual review only."""
+    if not current_app.config.get("PROCESSING_ENABLED"):
+        return jsonify(error="Procesamiento desactivado"), 503
+    data = request.get_json(silent=True)
+    ids = data.get("clip_ids") if isinstance(data, dict) else None
+    if (not isinstance(ids, list) or not 1 <= len(ids) <= 5
+            or any(type(item) is not int or item <= 0 for item in ids)
+            or len(set(ids)) != len(ids)):
+        return jsonify(error="clip_ids debe contener entre 1 y 5 enteros positivos únicos"), 400
+
+    clips_by_id = {clip.id: clip for clip in Clip.query.filter(Clip.id.in_(ids)).all()}
+    if len(clips_by_id) != len(ids):
+        return jsonify(error="Uno o más clips no existen"), 404
+    if any(clips_by_id[item].editorial_status not in
+           {"draft", "failed", "awaiting_worker"} for item in ids):
+        return jsonify(error="Uno o más clips no están pendientes de procesamiento"), 409
+
+    source_ids = {clip.source_id for clip in clips_by_id.values()}
+    sources = {source.id: source for source in
+               MediaSource.query.filter(MediaSource.id.in_(source_ids)).all()}
+    if any((source := sources.get(clips_by_id[item].source_id)) is None
+           or not assess_rights(source.rights_status, source.permission_evidence).allowed
+           for item in ids):
+        return jsonify(error="Una o más fuentes carecen de autorización válida"), 403
+
+    from ..tasks import render_clip_batch_task
+    try:
+        task = render_clip_batch_task.delay(ids)
+    except Exception:
+        return jsonify(error="Worker o Redis no disponible"), 503
+    return jsonify(task_id=task.id, clip_ids=ids,
+                   message="Lote enviado para procesamiento y revisión manual; no publica contenido"), 202
+
+
 @api_bp.post("/sources/<int:source_id>/analyze")
 @admin_only
 def analyze_source_request(source_id):

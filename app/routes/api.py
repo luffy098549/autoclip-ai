@@ -129,7 +129,8 @@ def clips():
         return jsonify(items=[{
             "id": c.id, "source_id": c.source_id, "start": c.start_seconds,
             "end": c.end_seconds, "status": c.editorial_status, "score": c.score,
-            "has_subtitles": (Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{c.id}.srt").is_file()
+            "has_subtitles": (c.editorial_status == "ready" and
+                              (Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{c.id}.srt").is_file())
         } for c in items])
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
@@ -259,8 +260,8 @@ def download_clip(clip_id):
 @admin_only
 def download_subtitles(clip_id):
     clip = db.session.get(Clip, clip_id)
-    if not clip:
-        return jsonify(error="Clip inexistente"), 404
+    if not clip or clip.editorial_status != "ready":
+        return jsonify(error="Subtítulos no disponibles para este clip"), 404
     source = db.session.get(MediaSource, clip.source_id)
     if source is None or not assess_rights(source.rights_status, source.permission_evidence).allowed:
         return jsonify(error="No se pueden descargar subtítulos sin autorización"), 403

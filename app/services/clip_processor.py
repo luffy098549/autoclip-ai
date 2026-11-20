@@ -28,16 +28,16 @@ def process_clip(clip_id: int):
         db.session.commit()
         raise PermissionError("La fuente no tiene autorización válida")
     target = Path(current_app.config["MEDIA_ROOT"]) / "clips" / f"clip-{clip.id}.mp4"
+    subtitles = Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{clip.id}.srt"
+    captioned = target.with_name(f"clip-{clip.id}-captioned.mp4")
     try:
         info = create_local_clip(source.source_uri, target, start=clip.start_seconds,
                                  end=clip.end_seconds, authorized=True)
         from .subtitle_export import export_clip_srt
-        subtitles = Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{clip.id}.srt"
         subtitle_path = export_clip_srt(clip.id, subtitles)
         clip.output_path = info["path"]
         if subtitle_path and current_app.config.get("AUTO_CAPTION_ENABLED"):
             from .caption_burn import burn_subtitles
-            captioned = target.with_name(f"clip-{clip.id}-captioned.mp4")
             burn_subtitles(info["path"], subtitle_path, captioned)
             clip.output_path = str(captioned)
             info["captioned_path"] = str(captioned)
@@ -50,6 +50,14 @@ def process_clip(clip_id: int):
         db.session.commit()
         return info
     except Exception:
+        # A revoked or failed render must not leave generated media accessible
+        # on disk. Only remove paths derived from this clip id, never paths
+        # returned by an encoder or supplied by an external source.
+        for artifact in (target, captioned, subtitles):
+            try:
+                artifact.unlink(missing_ok=True)
+            except OSError:
+                current_app.logger.warning("Could not remove failed clip artifact: %s", artifact.name)
         db.session.rollback()
         clip = db.session.get(Clip, clip_id)
         # A failed retry must never retain a previously rendered download path.

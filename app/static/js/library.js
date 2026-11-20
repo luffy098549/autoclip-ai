@@ -7,6 +7,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   const count=document.getElementById("library-count");
   let clips=[];
   const selectedForBatch = new Set();
+  let transferredSelection = "";
   const batchInput = document.getElementById("batch-render-ids");
   const batchFeedback = document.getElementById("batch-render-feedback");
   const eligible = new Set(["draft", "failed", "awaiting_worker"]);
@@ -27,6 +28,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   transferButton.addEventListener("click", () => {
     if (!batchInput || selectedForBatch.size === 0) return;
     batchInput.value = Array.from(selectedForBatch).join(", ");
+    transferredSelection = batchInput.value;
     if (batchFeedback) batchFeedback.textContent = "Selección preparada. Confirma Procesar lote para encolarla.";
     batchInput.focus();
   });
@@ -56,6 +58,16 @@ document.addEventListener("DOMContentLoaded",()=>{
       if (!clips.some(c => c.id === id && eligible.has(c.status))) selectedForBatch.delete(id);
     }
     updateSelection();
+    // Never submit IDs that became ineligible after a library refresh.
+    if (batchInput && transferredSelection && batchInput.value === transferredSelection) {
+      const validIds = new Set(Array.from(selectedForBatch).map(String));
+      const transferredIds = transferredSelection.split(",").map(value => value.trim());
+      if (transferredIds.some(id => !validIds.has(id))) {
+        batchInput.value = "";
+        transferredSelection = "";
+        if (batchFeedback) batchFeedback.textContent = "La selección cambió. Vuelve a transferir los clips elegibles antes de procesar.";
+      }
+    }
     gallery.replaceChildren();
     count.textContent=matching.length+" clips mostrados";
     if(!matching.length){

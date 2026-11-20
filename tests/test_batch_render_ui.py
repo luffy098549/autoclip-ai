@@ -105,3 +105,14 @@ def test_library_refresh_discards_out_of_order_responses_and_errors():
     assert 'Array.isArray(data.items)' in library
     assert 'clips=data.items;' in library
     assert '/publish' not in library
+
+
+def test_library_rejects_malformed_clip_records_before_rendering_links():
+    library = (Path(__file__).resolve().parents[1] / "app/static/js/library.js").read_text(encoding="utf-8")
+    assert "data.items.every(item =>" in library
+    assert "Number.isSafeInteger(item.id) && item.id > 0" in library
+    assert "Number.isSafeInteger(item.source_id) && item.source_id > 0" in library
+    assert 'typeof item.status === "string"' in library
+    assert "Number.isFinite(item.start) && Number.isFinite(item.end)" in library
+    assert "item.end > item.start" in library
+    assert "Respuesta inválida de la biblioteca" in library

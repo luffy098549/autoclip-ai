@@ -36,3 +36,20 @@ def test_batch_render_script_exists_and_uses_manual_queue_only():
     assert 'method: "POST"' in content
     assert "textContent" in content
     assert "/publish" not in content
+
+
+def test_batch_render_ui_handles_non_json_errors_and_missing_task_ids():
+    content = (Path(__file__).resolve().parents[1] / "app/static/js/batch-render.js").read_text(encoding="utf-8")
+    assert 'response.headers.get("content-type")' in content
+    assert 'response.status' in content
+    assert 'typeof payload.task_id !== "string"' in content
+    assert 'Respuesta inesperada del servidor' in content
+
+
+def test_batch_render_ui_reports_authorization_rejections_and_terminal_states():
+    content = (Path(__file__).resolve().parents[1] / "app/static/js/batch-render.js").read_text(encoding="utf-8")
+    assert "unauthorized_clip_ids" in content
+    assert 'payload.state === "SUCCESS"' in content
+    assert 'payload.state === "FAILURE"' in content
+    assert 'payload.state === "REVOKED"' in content
+    assert 'Array.isArray(result.failed_clip_ids)' in content

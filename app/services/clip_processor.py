@@ -31,6 +31,11 @@ def process_clip(clip_id: int):
     subtitles = Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{clip.id}.srt"
     captioned = target.with_name(f"clip-{clip.id}-captioned.mp4")
     try:
+        # A retry must not reuse artifacts left by an earlier attempt. In
+        # particular, a successful render without captions must not expose an
+        # obsolete SRT or captioned MP4 from a previous run.
+        for artifact in (target, captioned, subtitles):
+            artifact.unlink(missing_ok=True)
         info = create_local_clip(source.source_uri, target, start=clip.start_seconds,
                                  end=clip.end_seconds, authorized=True)
         from .subtitle_export import export_clip_srt

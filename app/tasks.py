@@ -128,6 +128,12 @@ def render_clip_batch_task(clip_ids):
                     unauthorized.append(clip_id)
                     continue
                 process_clip(clip_id)
+            except PermissionError:
+                # Authorization may be revoked during FFmpeg processing, after
+                # the initial source check. Report it as unauthorized, not as
+                # an ordinary encoder failure, and continue the batch.
+                db.session.rollback()
+                unauthorized.append(clip_id)
             except Exception:
                 # A failure in one clip must not poison the SQLAlchemy session
                 # used for the remaining independent renders.

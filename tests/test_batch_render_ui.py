@@ -95,3 +95,13 @@ def test_library_checkbox_changes_invalidate_prepared_batch():
     assert 'transferredSelection = "";' in library
     assert "invalidateTransferredSelection();\n          updateSelection();" in library
     assert '/api/clips/render-batch' not in library
+
+
+def test_library_refresh_discards_out_of_order_responses_and_errors():
+    library = (Path(__file__).resolve().parents[1] / "app/static/js/library.js").read_text(encoding="utf-8")
+    assert "let reloadSequence = 0;" in library
+    assert "const sequence = ++reloadSequence;" in library
+    assert library.count("if (sequence !== reloadSequence) return;") == 2
+    assert 'Array.isArray(data.items)' in library
+    assert 'clips=data.items;' in library
+    assert '/publish' not in library

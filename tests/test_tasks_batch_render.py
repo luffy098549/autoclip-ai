@@ -200,3 +200,13 @@ def test_batch_mixed_rights_keeps_authorized_rendering(monkeypatch, batch_contex
         "rendered_clip_ids": [1, 3], "failed_clip_ids": [],
         "skipped_clip_ids": [], "unauthorized_clip_ids": [2],
     }
+
+
+def test_batch_renders_pending_manual_clip(monkeypatch, batch_context):
+    statuses, seen, _ = batch_context
+    statuses[8] = "awaiting_worker"
+    monkeypatch.setattr(clip_processor, "process_clip", lambda clip_id: seen.append(clip_id))
+    result = render_clip_batch_task([8])
+    assert seen == [8]
+    assert result["rendered_clip_ids"] == [8]
+    assert result["failed_clip_ids"] == []

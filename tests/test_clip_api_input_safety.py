@@ -568,3 +568,62 @@ def test_batch_worker_does_not_process_queued_clip_after_rights_revocation(porta
     result = render_clip_batch_task.run([clip_id])
     assert result["unauthorized_clip_ids"] == [clip_id]
     assert result["rendered_clip_ids"] == []
+
+
+def test_revoked_pending_source_cleans_only_its_stale_artifacts(portal, monkeypatch):
+    app, _, source_id, root = portal
+    with app.app_context():
+        clip = Clip(source_id=source_id, start_seconds=0, end_seconds=5,
+                    editorial_status="failed")
+        db.session.add(clip)
+        source = db.session.get(MediaSource, source_id)
+        source.rights_status = "unverified"
+        source.permission_evidence = ""
+        db.session.commit()
+        clip_id = clip.id
+        target = root / "clips" / f"clip-{clip_id}.mp4"
+        captioned = root / "clips" / f"clip-{clip_id}-captioned.mp4"
+        subtitles = root / "subtitles" / f"clip-{clip_id}.srt"
+        unrelated = root / "clips" / "unrelated.mp4"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        subtitles.parent.mkdir(parents=True, exist_ok=True)
+        for artifact in (target, captioned, subtitles, unrelated):
+            artifact.write_bytes(b"old test artifact")
+
+        monkeypatch.setattr("app.services.clip_processor.create_local_clip",
+                            lambda *args, **kwargs: pytest.fail("revoked media encoded"))
+        from app.services.clip_processor import process_clip
+        with pytest.raises(PermissionError, match="autorización"):
+            process_clip(clip_id)
+        assert not target.exists()
+        assert not captioned.exists()
+        assert not subtitles.exists()
+        assert unrelated.read_bytes() == b"old test artifact"
+        db.session.expire_all()
+        stored = db.session.get(Clip, clip_id)
+        assert stored.editorial_status == "rejected"
+        assert stored.output_path is None
+
+
+def test_revoked_source_cleanup_error_still_rejects_clip(portal, monkeypatch):
+    app, _, source_id, root = portal
+    with app.app_context():
+        clip = Clip(source_id=source_id, start_seconds=0, end_seconds=5,
+                    editorial_status="queued")
+        db.session.add(clip)
+        source = db.session.get(MediaSource, source_id)
+        source.rights_status = "unverified"
+        source.permission_evidence = ""
+        db.session.commit()
+        clip_id = clip.id
+        target = root / "clips" / f"clip-{clip_id}.mp4"
+        target.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr("app.services.clip_processor.create_local_clip",
+                            lambda *args, **kwargs: pytest.fail("revoked media encoded"))
+        from app.services.clip_processor import process_clip
+        with pytest.raises(PermissionError, match="autorización"):
+            process_clip(clip_id)
+        db.session.expire_all()
+        stored = db.session.get(Clip, clip_id)
+        assert stored.editorial_status == "rejected"
+        assert stored.output_path is None

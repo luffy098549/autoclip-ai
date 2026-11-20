@@ -44,7 +44,7 @@ def analyze_source_task(source_id: int):
                     successes.append(clip_id)
                     continue
                 try:
-                    if not clip or clip.editorial_status not in {"draft", "failed"}:
+                    if not clip or clip.editorial_status not in {"draft", "failed", "awaiting_worker"}:
                         continue
                     source = db.session.get(MediaSource, clip.source_id)
                     if source is None or not assess_rights(source.rights_status, source.permission_evidence).allowed:

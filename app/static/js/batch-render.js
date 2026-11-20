@@ -7,6 +7,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const check = document.getElementById("batch-render-check");
   const submit = form.querySelector('button[type="submit"]');
   let taskId = null;
+  const refreshLibrary = () => {
+    const refresh = document.getElementById("library-refresh");
+    if (refresh) refresh.click();
+  };
 
   const report = message => { feedback.textContent = message; };
   async function jsonRequest(url, options = {}) {
@@ -75,6 +79,7 @@ document.addEventListener("DOMContentLoaded", () => {
         (payload.state === "FAILURE" ? " · El worker informó un fallo." : ""));
       if (payload.state === "SUCCESS" || payload.state === "FAILURE" || payload.state === "REVOKED") {
         check.hidden = true;
+        if (payload.state === "SUCCESS") refreshLibrary();
       }
     } catch (error) {
       report("No se pudo consultar el trabajo: " + error.message);

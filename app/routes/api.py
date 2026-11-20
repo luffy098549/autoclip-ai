@@ -126,6 +126,10 @@ def sources():
 def clips():
     if request.method == "GET":
         items = Clip.query.order_by(Clip.id.desc()).limit(100).all()
+        source_ids = {c.source_id for c in items}
+        authorized_sources = {source.id for source in MediaSource.query.filter(
+            MediaSource.id.in_(source_ids)).all()
+            if assess_rights(source.rights_status, source.permission_evidence).allowed}
         return jsonify(items=[{
             "id": c.id, "source_id": c.source_id, "start": c.start_seconds,
             "end": c.end_seconds, "status": c.editorial_status, "score": c.score,

@@ -61,3 +61,16 @@ def test_successful_batch_refreshes_library_without_publishing():
     assert 'if (payload.state === "SUCCESS") refreshLibrary();' in content
     assert 'if (refresh) refresh.click();' in content
     assert "/publish" not in content
+
+
+def test_library_batch_selection_is_manual_limited_and_state_gated():
+    library = (Path(__file__).resolve().parents[1] / "app/static/js/library.js").read_text(encoding="utf-8")
+    assert 'new Set(["draft", "failed", "awaiting_worker"])' in library
+    assert 'selectedForBatch.size >= 5' in library
+    assert 'selectedForBatch.delete(id)' in library
+    assert 'batchInput.value = Array.from(selectedForBatch).join(", ");' in library
+    assert 'batchInput.focus();' in library
+    assert 'transferButton.addEventListener("click"' in library
+    assert 'fetch("/api/clips"' in library
+    assert '/api/clips/render-batch' not in library
+    assert '/publish' not in library

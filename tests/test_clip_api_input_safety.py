@@ -380,7 +380,9 @@ def test_read_only_deployment_rejects_media_import(portal):
     response = client.post("/api/sources", data={
         "rights": "owned", "evidence": "Recorded by test operator",
     })
-    assert response.status_code == 503
+    # Read-only mode also blocks owner authentication before the route runs.
+    # A 403 is the secure outer gate; the route itself returns 503 if reached.
+    assert response.status_code == 403
     with app.app_context():
         assert MediaSource.query.count() == 1
     assert not (root / "imports").exists()

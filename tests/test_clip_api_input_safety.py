@@ -386,3 +386,48 @@ def test_read_only_deployment_rejects_media_import(portal):
     with app.app_context():
         assert MediaSource.query.count() == 1
     assert not (root / "imports").exists()
+
+
+@pytest.mark.parametrize("status", ["processing", "ready", "rejected"])
+def test_revoked_source_does_not_mutate_ineligible_clip(portal, monkeypatch, status):
+    app, _, source_id, root = portal
+    with app.app_context():
+        clip = Clip(source_id=source_id, start_seconds=0, end_seconds=5,
+                    editorial_status=status, output_path=str(root / "existing.mp4"))
+        db.session.add(clip)
+        source = db.session.get(MediaSource, source_id)
+        source.rights_status = "unverified"
+        source.permission_evidence = ""
+        db.session.commit()
+        clip_id = clip.id
+        monkeypatch.setattr("app.services.clip_processor.create_local_clip",
+                            lambda *args, **kwargs: pytest.fail("unexpected encoding"))
+        from app.services.clip_processor import process_clip
+        with pytest.raises(RuntimeError, match="not eligible"):
+            process_clip(clip_id)
+        db.session.expire_all()
+        stored = db.session.get(Clip, clip_id)
+        assert stored.editorial_status == status
+        assert stored.output_path == str(root / "existing.mp4")
+
+
+def test_revoked_pending_source_is_rejected_without_encoding(portal, monkeypatch):
+    app, _, source_id, root = portal
+    with app.app_context():
+        clip = Clip(source_id=source_id, start_seconds=0, end_seconds=5,
+                    editorial_status="queued", output_path=str(root / "stale.mp4"))
+        db.session.add(clip)
+        source = db.session.get(MediaSource, source_id)
+        source.rights_status = "unverified"
+        source.permission_evidence = ""
+        db.session.commit()
+        clip_id = clip.id
+        monkeypatch.setattr("app.services.clip_processor.create_local_clip",
+                            lambda *args, **kwargs: pytest.fail("unexpected encoding"))
+        from app.services.clip_processor import process_clip
+        with pytest.raises(PermissionError, match="autorización"):
+            process_clip(clip_id)
+        db.session.expire_all()
+        stored = db.session.get(Clip, clip_id)
+        assert stored.editorial_status == "rejected"
+        assert stored.output_path is None

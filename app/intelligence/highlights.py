@@ -46,6 +46,10 @@ def score_candidates(transcript_segments: list[dict], *,
             or type(max_clips) is not int or not 1 <= max_clips <= 5):
         raise ValueError("Invalid duration constraints")
     audio_peaks = _valid_audio_peaks(audio_peaks)
+    # A missing or malformed provider transcript is not a sequence of segments.
+    # In particular, dictionaries and strings should not be iterated as entries.
+    if not isinstance(transcript_segments, (list, tuple)):
+        return []
     segments = []
     for segment in transcript_segments:
         # Transcription providers may return malformed entries; ignore them

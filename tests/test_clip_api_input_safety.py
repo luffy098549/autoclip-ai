@@ -327,7 +327,8 @@ def test_render_does_not_mark_ready_if_rights_revoked_during_encoding(portal, mo
         with pytest.raises(PermissionError, match="revoked"):
             process_clip(clip_id)
         db.session.expire_all()
-        assert db.session.get(Clip, clip_id).editorial_status == "failed"
+        # Authorization revocation is terminal until rights are reviewed again.
+        assert db.session.get(Clip, clip_id).editorial_status == "rejected"
         assert db.session.get(Clip, clip_id).output_path is None
 
 

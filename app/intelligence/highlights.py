@@ -65,7 +65,7 @@ def score_candidates(transcript_segments: list[dict], *,
                 break
             # Overlapping subtitle segments can end before an earlier segment.
             # Keep the candidate window enclosing every included segment.
-            end = max(float(segment["end"]), float(covered[-1]["end"]) if covered else start)
+            end = max(float(segment["end"]), *(float(item["end"]) for item in covered))
             if end - start > maximum_seconds:
                 break
             covered.append(segment)

@@ -67,8 +67,8 @@ def _assert_source_rights_current(source):
 
 
 def analyze_source(source_id: int, *, model_size="small", max_clips=5):
-    if type(source_id) is not int or source_id < 1:
-        raise ValueError("source_id must be a positive integer")
+    if type(source_id) is not int or not 1 <= source_id <= 9223372036854775807:
+        raise ValueError("source_id must be a positive BIGINT identifier")
     if type(max_clips) is not int or not 1 <= max_clips <= 5:
         raise ValueError("max_clips must be an integer between 1 and 5")
     if (not isinstance(model_size, str) or not model_size.strip()

@@ -60,14 +60,17 @@ def score_candidates(transcript_segments: list[dict], *,
     for i, begin in enumerate(segments):
         start = float(begin["start"])
         covered = []
+        furthest_end = start
         for segment in segments[i:]:
-            if covered and float(segment["start"]) - float(covered[-1]["end"]) > 4:
+            # Nested Whisper segments can end earlier than a preceding segment.
+            # Use the furthest covered timestamp for both continuity and bounds.
+            if covered and float(segment["start"]) - furthest_end > 4:
                 break
-            # Overlapping subtitle segments can end before an earlier segment.
-            # Keep the candidate window enclosing every included segment.
-            end = max(float(segment["end"]), *(float(item["end"]) for item in covered))
-            if end - start > maximum_seconds:
+            next_end = max(furthest_end, float(segment["end"]))
+            if next_end - start > maximum_seconds:
                 break
+            furthest_end = next_end
+            end = furthest_end
             covered.append(segment)
             span = end - start
             if span < minimum_seconds:

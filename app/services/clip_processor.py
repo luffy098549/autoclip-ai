@@ -65,7 +65,7 @@ def process_clip(clip_id: int):
         clip.editorial_status = "ready"
         db.session.commit()
         return info
-    except Exception:
+    except Exception as error:
         # A revoked or failed render must not leave generated media accessible
         # on disk. Only remove paths derived from this clip id, never paths
         # returned by an encoder or supplied by an external source.
@@ -78,6 +78,11 @@ def process_clip(clip_id: int):
         clip = db.session.get(Clip, clip_id)
         # A failed retry must never retain a previously rendered download path.
         clip.output_path = None
-        clip.editorial_status = "failed"
+        # Revocation is an authorization decision, not an encoder failure.
+        # Keep the clip rejected so recovery jobs cannot retry it as a
+        # transient failure without a fresh rights review.
+        clip.editorial_status = "rejected" if isinstance(
+            error, PermissionError
+        ) else "failed"
         db.session.commit()
         raise

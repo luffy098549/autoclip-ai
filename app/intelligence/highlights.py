@@ -79,7 +79,7 @@ def score_candidates(transcript_segments: list[dict], *,
         # candidate windows (including when malformed provider text was dropped).
         # Punctuation, emoji and zero-width formatting are not spoken words;
         # do not let such captions bridge otherwise disconnected speech.
-        if not re.search(r"\w", text, re.UNICODE):
+        if not any(character.isalnum() for character in text):
             continue
         segments.append({"start": start, "end": end, "text": text})
     # Providers sometimes repeat the same timed segment. Avoid counting its

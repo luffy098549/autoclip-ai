@@ -58,6 +58,11 @@ def select_candidates(candidates: list[Candidate], *, threshold: float = 75.0,
         for existing in selected:
             existing_start_ms = int(existing.start * 1000)
             existing_end_ms = int(existing.end * 1000)
+            # Identical millisecond windows are duplicates even when callers
+            # permit 100% overlap between distinct windows.
+            if start_ms == existing_start_ms and end_ms == existing_end_ms:
+                overlap = True
+                break
             shared = max(0, min(end_ms, existing_end_ms) - max(start_ms, existing_start_ms))
             shorter = min(end_ms - start_ms, existing_end_ms - existing_start_ms)
             if shorter <= 0 or shared / shorter > max_overlap_ratio:

@@ -6,6 +6,10 @@ from .rights import assess_rights
 from ..pipeline import create_local_clip
 
 
+class ClipNotEligibleError(RuntimeError):
+    """Another worker claimed the clip, or its status forbids rendering."""
+
+
 def process_clip(clip_id: int):
     clip = db.session.get(Clip, clip_id)
     if clip is None:
@@ -19,7 +23,7 @@ def process_clip(clip_id: int):
     ).update({Clip.editorial_status: "processing"}, synchronize_session=False)
     db.session.commit()
     if claimed != 1:
-        raise RuntimeError("Clip already processing or not eligible for rendering")
+        raise ClipNotEligibleError("Clip already processing or not eligible for rendering")
     db.session.refresh(clip)
     target = Path(current_app.config["MEDIA_ROOT"]) / "clips" / f"clip-{clip.id}.mp4"
     subtitles = Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{clip.id}.srt"

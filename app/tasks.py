@@ -47,6 +47,7 @@ def analyze_source_task(source_id: int):
             from .models import MediaSource
             successes = []
             failures = []
+            unauthorized = []
             for clip_id in result["clip_ids"]:
                 clip = db.session.get(Clip, clip_id)
                 if clip and clip.editorial_status == "ready":
@@ -57,13 +58,18 @@ def analyze_source_task(source_id: int):
                         continue
                     source = db.session.get(MediaSource, clip.source_id)
                     if source is None or not assess_rights(source.rights_status, source.permission_evidence).allowed:
-                        failures.append(clip_id)
+                        unauthorized.append(clip_id)
                         continue
                     if reserve_review_slot(clip_id) is None:
                         result.setdefault("deferred_clip_ids", []).append(clip_id)
                         continue
                     process_clip(clip_id)
                     successes.append(clip_id)
+                except PermissionError:
+                    # Rights can be revoked between preflight and rendering.
+                    # Preserve the distinction from a transient encoder error.
+                    db.session.rollback()
+                    unauthorized.append(clip_id)
                 except Exception:
                     # A failed commit or render can invalidate the session; recover
                     # before looking up the next candidate in this batch.
@@ -71,6 +77,7 @@ def analyze_source_task(source_id: int):
                     failures.append(clip_id)
             result["rendered_clip_ids"] = successes
             result["failed_clip_ids"] = failures
+            result["unauthorized_clip_ids"] = unauthorized
         return result
 
 

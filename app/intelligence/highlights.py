@@ -60,6 +60,9 @@ def score_candidates(transcript_segments: list[dict], *,
         # rather than aborting the whole analysis job.
         if not isinstance(segment, dict):
             continue
+        # Booleans are not timestamps, even though float(True) is 1.0.
+        if type(segment.get("start")) is bool or type(segment.get("end")) is bool:
+            continue
         try:
             start, end = float(segment["start"]), float(segment["end"])
         except (KeyError, TypeError, ValueError, OverflowError):
@@ -74,7 +77,9 @@ def score_candidates(transcript_segments: list[dict], *,
             text = ""
         # Empty captions carry no spoken evidence and must not extend or bridge
         # candidate windows (including when malformed provider text was dropped).
-        if not text.strip():
+        # Punctuation, emoji and zero-width formatting are not spoken words;
+        # do not let such captions bridge otherwise disconnected speech.
+        if not re.search(r"\w", text, re.UNICODE):
             continue
         segments.append({"start": start, "end": end, "text": text})
     # Providers sometimes repeat the same timed segment. Avoid counting its

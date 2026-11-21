@@ -48,6 +48,10 @@ def score_candidates(transcript_segments: list[dict], *,
     audio_peaks = _valid_audio_peaks(audio_peaks)
     segments = []
     for segment in transcript_segments:
+        # Transcription providers may return malformed entries; ignore them
+        # rather than aborting the whole analysis job.
+        if not isinstance(segment, dict):
+            continue
         try:
             start, end = float(segment["start"]), float(segment["end"])
         except (KeyError, TypeError, ValueError, OverflowError):

@@ -54,6 +54,18 @@ from ..intelligence.highlights import score_candidates
 from ..intelligence.audio_peaks import detect_audio_peaks
 
 
+def _assert_source_rights_current(source):
+    """Reload authorization before committing derived transcripts and clips.
+
+    A source may lose its permission while Whisper/FFmpeg is running. Expire
+    cached fields so the next access re-reads the database instead of trusting
+    the rights snapshot taken before processing.
+    """
+    db.session.expire(source, ["rights_status", "permission_evidence"])
+    if not assess_rights(source.rights_status, source.permission_evidence).allowed:
+        raise PermissionError("Source authorization was revoked during analysis")
+
+
 def analyze_source(source_id: int, *, model_size="small", max_clips=5):
     if type(source_id) is not int or source_id < 1:
         raise ValueError("source_id must be a positive integer")
@@ -102,6 +114,7 @@ def analyze_source(source_id: int, *, model_size="small", max_clips=5):
                 db.session.add(clip)
                 db.session.flush()
                 ids.append(clip.id)
+        _assert_source_rights_current(source)
         db.session.commit()
         return {"source_id": source_id, "clip_ids": ids,
                 "transcript_segments": len(transcript), "audio_peaks": len(audio_peaks),

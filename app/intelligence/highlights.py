@@ -24,14 +24,18 @@ def _valid_audio_peaks(peaks):
     """Discard malformed optional peaks rather than aborting transcript analysis."""
     if not isinstance(peaks, (list, tuple)):
         return []
-    valid = []
+    # A provider may emit the same audio frame more than once. Count each
+    # timestamp only once so duplicates cannot inflate highlight rankings.
+    strongest_by_time = {}
     for peak in peaks:
         if not isinstance(peak, (list, tuple)) or len(peak) != 2:
             continue
         timestamp, strength = peak
-        if _finite_number(timestamp) and _finite_number(strength):
-            valid.append((timestamp, strength))
-    return valid
+        if _finite_number(timestamp) and _finite_number(strength) and timestamp >= 0:
+            strongest_by_time[timestamp] = max(
+                strongest_by_time.get(timestamp, 0.0), strength
+            )
+    return sorted(strongest_by_time.items())
 
 
 def score_candidates(transcript_segments: list[dict], *,

@@ -2,7 +2,7 @@
 from app.intelligence.highlights import score_candidates
 
 
-WORDS = " ".join(["amazing"] * 25)
+WORDS = "amazing this moment shows why creative highlights deserve careful review before anyone chooses to share a clip with their own audience today"
 
 
 def test_nested_segment_does_not_break_contiguous_window():

@@ -80,7 +80,9 @@ def score_candidates(transcript_segments: list[dict], *,
                 break
             next_end = max(furthest_end, float(segment["end"]))
             if next_end - start > maximum_seconds:
-                break
+                # An oversized/nested segment need not invalidate later
+                # shorter segments whose timestamps still fit the window.
+                continue
             furthest_end = next_end
             end = furthest_end
             covered.append(segment)

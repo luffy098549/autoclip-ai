@@ -27,7 +27,7 @@ def test_boolean_timestamps_are_ignored(field, value):
     assert [(item.start, item.end) for item in result] == [(0, 30)]
 
 
-@pytest.mark.parametrize("caption", ["!!! ???", "🎬🔥", "\u200b\u200d", "  ...  "])
+@pytest.mark.parametrize("caption", ["!!! ???", "🎬🔥", "\u200b\u200d", "  ...  ", "___", "__ __"])
 def test_nonverbal_captions_cannot_bridge_a_gap(caption):
     result = highlights.score_candidates([
         {"start": 0, "end": 30, "text": TEXT},

@@ -72,6 +72,10 @@ def score_candidates(transcript_segments: list[dict], *,
         text = segment.get("text")
         if not isinstance(text, str):
             text = ""
+        # Empty captions carry no spoken evidence and must not extend or bridge
+        # candidate windows (including when malformed provider text was dropped).
+        if not text.strip():
+            continue
         segments.append({"start": start, "end": end, "text": text})
     # Providers sometimes repeat the same timed segment. Avoid counting its
     # words and emphasis twice, which would distort candidate scoring.

@@ -66,7 +66,13 @@ def score_candidates(transcript_segments: list[dict], *,
             continue
         if not (math.isfinite(start) and math.isfinite(end) and 0 <= start < end):
             continue
-        segments.append({"start": start, "end": end, "text": str(segment.get("text") or "")})
+        # Treat provider text as untrusted structured data. A dict/list or a
+        # custom object must not be stringified into fabricated spoken words,
+        # nor be allowed to crash a processing job via __str__.
+        text = segment.get("text")
+        if not isinstance(text, str):
+            text = ""
+        segments.append({"start": start, "end": end, "text": text})
     # Providers sometimes repeat the same timed segment. Avoid counting its
     # words and emphasis twice, which would distort candidate scoring.
     seen_segments = set()

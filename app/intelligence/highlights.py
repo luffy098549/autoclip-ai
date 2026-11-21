@@ -67,7 +67,17 @@ def score_candidates(transcript_segments: list[dict], *,
         if not (math.isfinite(start) and math.isfinite(end) and 0 <= start < end):
             continue
         segments.append({"start": start, "end": end, "text": str(segment.get("text") or "")})
-    segments.sort(key=lambda x: x["start"])
+    # Providers sometimes repeat the same timed segment. Avoid counting its
+    # words and emphasis twice, which would distort candidate scoring.
+    seen_segments = set()
+    unique_segments = []
+    for segment in segments:
+        identity = (segment["start"], segment["end"], segment["text"])
+        if identity in seen_segments:
+            continue
+        seen_segments.add(identity)
+        unique_segments.append(segment)
+    segments = sorted(unique_segments, key=lambda x: (x["start"], x["end"]))
     out = []
     for i, begin in enumerate(segments):
         start = float(begin["start"])

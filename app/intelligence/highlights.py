@@ -24,14 +24,18 @@ def _valid_audio_peaks(peaks):
     """Discard malformed optional peaks rather than aborting transcript analysis."""
     if not isinstance(peaks, (list, tuple)):
         return []
-    valid = []
+    # A provider may emit the same audio frame more than once. Count each
+    # timestamp only once so duplicates cannot inflate highlight rankings.
+    strongest_by_time = {}
     for peak in peaks:
         if not isinstance(peak, (list, tuple)) or len(peak) != 2:
             continue
         timestamp, strength = peak
-        if _finite_number(timestamp) and _finite_number(strength):
-            valid.append((timestamp, strength))
-    return valid
+        if _finite_number(timestamp) and _finite_number(strength) and timestamp >= 0:
+            strongest_by_time[timestamp] = max(
+                strongest_by_time.get(timestamp, 0.0), strength
+            )
+    return sorted(strongest_by_time.items())
 
 
 def score_candidates(transcript_segments: list[dict], *,
@@ -46,8 +50,16 @@ def score_candidates(transcript_segments: list[dict], *,
             or type(max_clips) is not int or not 1 <= max_clips <= 5):
         raise ValueError("Invalid duration constraints")
     audio_peaks = _valid_audio_peaks(audio_peaks)
+    # A missing or malformed provider transcript is not a sequence of segments.
+    # In particular, dictionaries and strings should not be iterated as entries.
+    if not isinstance(transcript_segments, (list, tuple)):
+        return []
     segments = []
     for segment in transcript_segments:
+        # Transcription providers may return malformed entries; ignore them
+        # rather than aborting the whole analysis job.
+        if not isinstance(segment, dict):
+            continue
         try:
             start, end = float(segment["start"]), float(segment["end"])
         except (KeyError, TypeError, ValueError, OverflowError):
@@ -60,12 +72,19 @@ def score_candidates(transcript_segments: list[dict], *,
     for i, begin in enumerate(segments):
         start = float(begin["start"])
         covered = []
+        furthest_end = start
         for segment in segments[i:]:
-            if covered and float(segment["start"]) - float(covered[-1]["end"]) > 4:
+            # Nested Whisper segments can end earlier than a preceding segment.
+            # Use the furthest covered timestamp for both continuity and bounds.
+            if covered and float(segment["start"]) - furthest_end > 4:
                 break
-            end = float(segment["end"])
-            if end - start > maximum_seconds:
-                break
+            next_end = max(furthest_end, float(segment["end"]))
+            if next_end - start > maximum_seconds:
+                # An oversized/nested segment need not invalidate later
+                # shorter segments whose timestamps still fit the window.
+                continue
+            furthest_end = next_end
+            end = furthest_end
             covered.append(segment)
             span = end - start
             if span < minimum_seconds:

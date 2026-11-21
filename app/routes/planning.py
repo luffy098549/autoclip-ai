@@ -4,7 +4,7 @@ from pathlib import Path
 from uuid import uuid4
 import re
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 from sqlalchemy import text
 
 from ..models import db, Clip, MediaSource, Publication
@@ -62,12 +62,17 @@ def plans():
                        publishing_enabled=False,
                        note="Solo borradores locales: ningún video se publica.")
 
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(error="Se requiere un objeto JSON válido"), 400
     platform = str(data.get("platform", "")).strip().lower()
     if platform not in PLATFORMS:
         return jsonify(error="Selecciona YouTube, TikTok o Instagram"), 400
     try:
-        clip_id = int(data.get("clip_id"))
+        raw_clip_id = data.get("clip_id")
+        if isinstance(raw_clip_id, bool) or not isinstance(raw_clip_id, (str, int)) or not re.fullmatch(r"[0-9]+", str(raw_clip_id)):
+            raise ValueError("Selecciona un clip válido")
+        clip_id = int(raw_clip_id)
         proposed = _parse_ny_time(data.get("scheduled_local"))
     except (ValueError, TypeError, OverflowError) as exc:
         return jsonify(error=str(exc) or "Datos inválidos"), 400
@@ -93,9 +98,14 @@ def plans():
         ).allowed:
             db.session.rollback()
             return jsonify(error="No hay derechos de uso confirmados"), 403
-        if not Path(clip.output_path).is_file():
+        # Only schedule rendered MP4s under the managed clips directory.
+        # Resolving both paths also rejects symlinks escaping MEDIA_ROOT.
+        clips_directory = (Path(current_app.config["MEDIA_ROOT"]) / "clips").resolve()
+        video = Path(clip.output_path).resolve()
+        if (video.parent != clips_directory or video.suffix.lower() != ".mp4"
+                or not video.is_file()):
             db.session.rollback()
-            return jsonify(error="No se encuentra el video exportado"), 400
+            return jsonify(error="No se encuentra un video exportado válido"), 400
         existing = Publication.query.filter(
             Publication.platform == platform, Publication.state.in_(ACTIVE_STATES)
         ).all()
@@ -118,11 +128,72 @@ def plans():
 @planning_bp.post("/plans/<int:plan_id>/cancel")
 @admin_only
 def cancel_plan(plan_id):
-    item = db.session.get(Publication, plan_id)
-    if item is None:
-        return jsonify(error="Plan no encontrado"), 404
-    if item.state != "planned":
-        return jsonify(error="Solo se pueden cancelar borradores pendientes"), 409
-    item.state = "canceled"
-    db.session.commit()
-    return jsonify(item=_serialize(item), message="Borrador cancelado")
+    """Cancel a draft under the same platform lock used by rescheduling."""
+    try:
+        item = db.session.get(Publication, plan_id)
+        if item is None:
+            return jsonify(error="Plan no encontrado"), 404
+        if item.platform not in PLATFORMS:
+            return jsonify(error="Plataforma no válida"), 400
+        if db.engine.dialect.name == "postgresql":
+            lock_keys = {"youtube": 100091, "tiktok": 100092, "instagram": 100093}
+            db.session.execute(
+                text("SELECT pg_advisory_xact_lock(:key)"),
+                {"key": lock_keys[item.platform]},
+            )
+            db.session.refresh(item)
+        if item.state != "planned":
+            return jsonify(error="Solo se pueden cancelar borradores pendientes"), 409
+        item.state = "canceled"
+        db.session.commit()
+        return jsonify(item=_serialize(item), message="Borrador cancelado")
+    except Exception:
+        db.session.rollback()
+        raise
+
+
+@planning_bp.post("/plans/<int:plan_id>/reschedule")
+@admin_only
+def reschedule_plan(plan_id):
+    """Move an unpublished local draft without triggering external publication."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(error="Se requiere un objeto JSON válido"), 400
+    try:
+        proposed = _parse_ny_time(data.get("scheduled_local"))
+    except (ValueError, TypeError, OverflowError) as exc:
+        return jsonify(error=str(exc) or "Horario inválido"), 400
+    if proposed <= datetime.now(timezone.utc):
+        return jsonify(error="El horario debe estar en el futuro"), 400
+
+    try:
+        item = db.session.get(Publication, plan_id)
+        if item is None:
+            return jsonify(error="Plan no encontrado"), 404
+        if item.state != "planned":
+            return jsonify(error="Solo se pueden modificar borradores pendientes"), 409
+        if item.platform not in PLATFORMS:
+            return jsonify(error="Plataforma no válida"), 400
+        if db.engine.dialect.name == "postgresql":
+            lock_keys = {"youtube": 100091, "tiktok": 100092, "instagram": 100093}
+            db.session.execute(
+                text("SELECT pg_advisory_xact_lock(:key)"),
+                {"key": lock_keys[item.platform]},
+            )
+            # Reload after acquiring the lock so concurrent changes are visible.
+            db.session.refresh(item)
+            if item.state != "planned":
+                return jsonify(error="Solo se pueden modificar borradores pendientes"), 409
+        existing = Publication.query.filter(
+            Publication.platform == item.platform,
+            Publication.state.in_(ACTIVE_STATES),
+            Publication.id != item.id,
+        ).all()
+        if not can_schedule(proposed, [_to_utc(p.scheduled_at) for p in existing]):
+            return jsonify(error="Mínimo 120 minutos entre planes y 5 al día por red"), 409
+        item.scheduled_at = proposed
+        db.session.commit()
+        return jsonify(item=_serialize(item), message="Borrador reprogramado sin publicar")
+    except Exception:
+        db.session.rollback()
+        raise

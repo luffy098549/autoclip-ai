@@ -41,7 +41,7 @@ def analyze_source_task(source_id: int):
         result = analyze_source(source_id)
         if app.config.get("AUTO_RENDER_ENABLED"):
             from .models import db, Clip
-            from .services.clip_processor import process_clip
+            from .services.clip_processor import process_clip, ClipNotEligibleError
             from .services.daily_review import reserve_review_slot
             from .services.rights import assess_rights
             from .models import MediaSource
@@ -65,6 +65,9 @@ def analyze_source_task(source_id: int):
                         continue
                     process_clip(clip_id)
                     successes.append(clip_id)
+                except ClipNotEligibleError:
+                    db.session.rollback()
+                    result.setdefault("skipped_clip_ids", []).append(clip_id)
                 except PermissionError:
                     # Rights can be revoked between preflight and rendering.
                     # Preserve the distinction from a transient encoder error.
@@ -110,7 +113,7 @@ def render_clip_batch_task(clip_ids):
         raise ValueError("Duplicate clip IDs")
 
     from . import create_app
-    from .services.clip_processor import process_clip
+    from .services.clip_processor import process_clip, ClipNotEligibleError
     from .models import db, Clip, MediaSource
     from .services.rights import assess_rights
 
@@ -135,6 +138,10 @@ def render_clip_batch_task(clip_ids):
                     unauthorized.append(clip_id)
                     continue
                 process_clip(clip_id)
+            except ClipNotEligibleError:
+                # A competing worker claimed the clip after preflight.
+                db.session.rollback()
+                skipped.append(clip_id)
             except PermissionError:
                 # Authorization may be revoked during FFmpeg processing, after
                 # the initial source check. Report it as unauthorized, not as

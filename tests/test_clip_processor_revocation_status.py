@@ -10,7 +10,7 @@ from app.services import clip_processor, subtitle_export
 
 @pytest.mark.parametrize(
     ("error_kind", "expected_status"),
-    [("revoked", "rejected"), ("encoder", "failed")],
+    [("revoked", "rejected"), ("encoder", "failed"), ("filesystem", "failed")],
 )
 def test_render_failure_distinguishes_revoked_rights_from_encoder_errors(
     tmp_path, monkeypatch, error_kind, expected_status
@@ -46,10 +46,12 @@ def test_render_failure_distinguishes_revoked_rights_from_encoder_errors(
             target.write_bytes(b"test-only-render")
             if error_kind == "encoder":
                 raise RuntimeError("synthetic FFmpeg failure")
+            if error_kind == "filesystem":
+                raise PermissionError("synthetic output directory permission failure")
             return {"path": str(target)}
 
         monkeypatch.setattr(clip_processor, "create_local_clip", fake_render)
-        expected_error = PermissionError if error_kind == "revoked" else RuntimeError
+        expected_error = RuntimeError if error_kind == "encoder" else PermissionError
         with pytest.raises(expected_error):
             clip_processor.process_clip(clip_id)
 

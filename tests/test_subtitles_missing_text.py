@@ -28,4 +28,4 @@ def test_structured_provider_metadata_is_not_rendered_as_dialogue():
     assert "Real words" in result
     assert "not spoken" not in result
     assert "12345" not in result
-    assert result.startswith("1\\n")
+    assert result.splitlines()[0] == "1"

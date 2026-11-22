@@ -39,7 +39,7 @@ def test_analysis_auto_render_continues_after_revocation(monkeypatch):
     def render(clip_id):
         attempted.append(clip_id)
         if clip_id == 1:
-            raise PermissionError("revoked during render")
+            raise clip_processor.SourceAuthorizationRevoked("revoked during render")
         if clip_id == 2:
             raise RuntimeError("encoder failed")
         return {"path": "rendered.mp4"}

@@ -22,8 +22,8 @@ def reserve_review_slot(clip_id: int, now: datetime | None = None) -> int | None
     """
     if type(clip_id) is not int or not 0 < clip_id <= (2**63 - 1):
         raise ValueError("clip_id must be a positive database integer")
-    instant = now or datetime.now(timezone.utc)
-    if instant.tzinfo is None or instant.utcoffset() is None:
+    instant = datetime.now(timezone.utc) if now is None else now
+    if not isinstance(instant, datetime) or instant.tzinfo is None or instant.utcoffset() is None:
         raise ValueError("now must be timezone-aware")
     day = instant.astimezone(REVIEW_TIMEZONE).date()
     for slot in range(1, DAILY_LIMIT + 1):

@@ -18,6 +18,11 @@ def process_clip(clip_id: int):
     clip = db.session.get(Clip, clip_id)
     if clip is None:
         raise ValueError("Clip no encontrado")
+    # Resolve output paths before claiming the record. A missing or invalid
+    # MEDIA_ROOT must not strand the clip in processing status.
+    target = Path(current_app.config["MEDIA_ROOT"]) / "clips" / f"clip-{clip.id}.mp4"
+    subtitles = Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{clip.id}.srt"
+    captioned = target.with_name(f"clip-{clip.id}-captioned.mp4")
     # Claim before touching editorial state: a stale worker must not reject a
     # clip that another worker is already processing or has completed.
     # Claim atomically to prevent concurrent workers overwriting one output.
@@ -29,9 +34,6 @@ def process_clip(clip_id: int):
     if claimed != 1:
         raise ClipNotEligibleError("Clip already processing or not eligible for rendering")
     db.session.refresh(clip)
-    target = Path(current_app.config["MEDIA_ROOT"]) / "clips" / f"clip-{clip.id}.mp4"
-    subtitles = Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{clip.id}.srt"
-    captioned = target.with_name(f"clip-{clip.id}-captioned.mp4")
     source = db.session.get(MediaSource, clip.source_id)
     if source is None or not assess_rights(source.rights_status, source.permission_evidence).allowed:
         # A revoked source must not leave stale artifacts from an earlier

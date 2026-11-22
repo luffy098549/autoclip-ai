@@ -35,6 +35,8 @@ def test_batch_render_reports_outcome_and_continues(monkeypatch, outcome, expect
     )
     monkeypatch.setattr(rights, "assess_rights", lambda *args: SimpleNamespace(allowed=True))
 
+    from app.services import daily_review
+    monkeypatch.setattr(daily_review, "reserve_review_slot", lambda clip_id: clip_id)
     processed = []
 
     def process(clip_id):

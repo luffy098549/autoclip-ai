@@ -12,6 +12,7 @@ from app.tasks import render_clip_batch_task
     [
         ("revoked", "unauthorized_clip_ids"),
         ("encoder_failure", "failed_clip_ids"),
+        ("filesystem_denied", "failed_clip_ids"),
         ("success", "rendered_clip_ids"),
     ],
 )
@@ -39,7 +40,9 @@ def test_batch_render_reports_outcome_and_continues(monkeypatch, outcome, expect
     def process(clip_id):
         processed.append(clip_id)
         if clip_id == 1 and outcome == "revoked":
-            raise PermissionError("authorization revoked during rendering")
+            raise clip_processor.SourceAuthorizationRevoked("authorization revoked during rendering")
+        if clip_id == 1 and outcome == "filesystem_denied":
+            raise PermissionError("filesystem access denied")
         if clip_id == 1 and outcome == "encoder_failure":
             raise RuntimeError("encoder failed")
         return {"path": f"clip-{clip_id}.mp4"}
@@ -50,6 +53,6 @@ def test_batch_render_reports_outcome_and_continues(monkeypatch, outcome, expect
     assert processed == [1, 2]
     assert result[expected_key] == ([1] if outcome != "success" else [1, 2])
     assert result["rendered_clip_ids"] == ([1, 2] if outcome == "success" else [2])
-    assert result["failed_clip_ids"] == ([1] if outcome == "encoder_failure" else [])
+    assert result["failed_clip_ids"] == ([1] if outcome in {"encoder_failure", "filesystem_denied"} else [])
     assert result["unauthorized_clip_ids"] == ([1] if outcome == "revoked" else [])
     assert result["skipped_clip_ids"] == []

@@ -10,6 +10,7 @@ from app.services.subtitle_export import export_clip_srt
     ("texts", "expected_cues"),
     [
         ([" ", "\n\t"], 0),
+        (["\x00", " \x00 "], 0),
         ([" ", "Hello there", "\n"], 1),
     ],
 )
@@ -92,3 +93,43 @@ def test_export_replace_failure_preserves_existing_sidecar(tmp_path, monkeypatch
         assert not list(tmp_path.glob(".autoclip-srt-*"))
         db.session.remove()
         db.drop_all()
+
+
+def test_blank_submillisecond_segment_does_not_block_valid_cue(tmp_path):
+    """An unusable blank cue must not fail the export of valid speech."""
+    app = create_app({
+        "TESTING": True,
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "MEDIA_ROOT": str(tmp_path),
+    })
+    with app.app_context():
+        db.create_all()
+        try:
+            source = MediaSource(
+                source_uri=str(tmp_path / "owned.mp4"),
+                rights_status="owned",
+                permission_evidence="original media",
+            )
+            db.session.add(source)
+            db.session.flush()
+            clip = Clip(source_id=source.id, start_seconds=0, end_seconds=10)
+            db.session.add_all([
+                clip,
+                TranscriptSegment(
+                    source_id=source.id, start_seconds=0,
+                    end_seconds=0.0001, text=" \x00 ",
+                ),
+                TranscriptSegment(
+                    source_id=source.id, start_seconds=1,
+                    end_seconds=3, text="Valid speech",
+                ),
+            ])
+            db.session.commit()
+            destination = tmp_path / "clip.srt"
+            assert export_clip_srt(clip.id, destination) == destination
+            content = destination.read_text(encoding="utf-8")
+            assert "Valid speech" in content
+            assert content.count(" --> ") == 1
+        finally:
+            db.session.remove()
+            db.drop_all()

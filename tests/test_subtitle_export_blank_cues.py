@@ -133,3 +133,44 @@ def test_blank_submillisecond_segment_does_not_block_valid_cue(tmp_path):
         finally:
             db.session.remove()
             db.drop_all()
+
+
+def test_nonblank_submillisecond_segment_is_skipped_without_losing_valid_speech(tmp_path):
+    """Tiny transcribed fragments must not invalidate the whole SRT."""
+    app = create_app({
+        "TESTING": True,
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "MEDIA_ROOT": str(tmp_path),
+    })
+    with app.app_context():
+        db.create_all()
+        try:
+            source = MediaSource(
+                source_uri=str(tmp_path / "owned.mp4"),
+                rights_status="owned",
+                permission_evidence="original media",
+            )
+            db.session.add(source)
+            db.session.flush()
+            clip = Clip(source_id=source.id, start_seconds=0, end_seconds=10)
+            db.session.add_all([
+                clip,
+                TranscriptSegment(
+                    source_id=source.id, start_seconds=0,
+                    end_seconds=0.0001, text="tiny",
+                ),
+                TranscriptSegment(
+                    source_id=source.id, start_seconds=1,
+                    end_seconds=3, text="Full sentence",
+                ),
+            ])
+            db.session.commit()
+            destination = tmp_path / "clip.srt"
+            assert export_clip_srt(clip.id, destination) == destination
+            content = destination.read_text(encoding="utf-8")
+            assert "Full sentence" in content
+            assert "tiny" not in content
+            assert content.count(" --> ") == 1
+        finally:
+            db.session.remove()
+            db.drop_all()

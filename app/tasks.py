@@ -26,8 +26,19 @@ def render_clip_task(clip_id: int):
     _require_positive_id(clip_id, "Clip ID")
     from . import create_app
     from .services.clip_processor import process_clip
+    from .services.daily_review import reserve_review_slot
+    from .services.rights import assess_rights
+    from .models import db, Clip, MediaSource
     app = create_app()
     with app.app_context():
+        clip = db.session.get(Clip, clip_id)
+        if clip is None or clip.editorial_status not in {"draft", "failed", "awaiting_worker", "queued"}:
+            return {"status": "skipped", "clip_id": clip_id}
+        source = db.session.get(MediaSource, clip.source_id)
+        if source is None or not assess_rights(source.rights_status, source.permission_evidence).allowed:
+            return {"status": "unauthorized", "clip_id": clip_id}
+        if reserve_review_slot(clip_id) is None:
+            return {"status": "deferred", "clip_id": clip_id}
         return process_clip(clip_id)
 
 

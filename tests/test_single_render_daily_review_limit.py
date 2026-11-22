@@ -49,3 +49,28 @@ def test_single_render_rejects_invalid_id_without_app(monkeypatch, invalid):
     monkeypatch.setattr(app, "create_app", lambda: pytest.fail("invalid ID reached app"))
     with pytest.raises(ValueError):
         render_clip_task.run(invalid)
+
+
+@pytest.mark.parametrize("error_name,expected_status", [
+    ("ClipNotEligibleError", "skipped"),
+    ("SourceAuthorizationRevoked", "unauthorized"),
+])
+def test_single_render_handles_race_or_revocation(monkeypatch, error_name, expected_status):
+    monkeypatch.setattr(app, "create_app", lambda: Flask(__name__))
+    monkeypatch.setattr(db.session, "get", lambda model, identifier: (
+        SimpleNamespace(editorial_status="draft", source_id=12) if model is Clip
+        else SimpleNamespace(rights_status="owned", permission_evidence="original footage")
+    ))
+    monkeypatch.setattr(daily_review, "reserve_review_slot", lambda clip_id: 1)
+    from app.services.clip_processor import ClipNotEligibleError, SourceAuthorizationRevoked
+    error_type = {
+        "ClipNotEligibleError": ClipNotEligibleError,
+        "SourceAuthorizationRevoked": SourceAuthorizationRevoked,
+    }[error_name]
+    def raise_error(_clip_id):
+        raise error_type("worker preflight changed")
+    monkeypatch.setattr(clip_processor, "process_clip", raise_error)
+    rolled_back = []
+    monkeypatch.setattr(db.session, "rollback", lambda: rolled_back.append(True))
+    assert render_clip_task.run(7) == {"status": expected_status, "clip_id": 7}
+    assert rolled_back == [True]

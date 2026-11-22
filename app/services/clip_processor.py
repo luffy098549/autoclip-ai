@@ -34,20 +34,14 @@ def process_clip(clip_id: int):
     if claimed != 1:
         raise ClipNotEligibleError("Clip already processing or not eligible for rendering")
     db.session.refresh(clip)
-    source = db.session.get(MediaSource, clip.source_id)
-    if source is None or not assess_rights(source.rights_status, source.permission_evidence).allowed:
-        # A revoked source must not leave stale artifacts from an earlier
-        # attempt accessible by direct file paths. Only delete clip-owned paths.
-        for artifact in (target, captioned, subtitles):
-            try:
-                artifact.unlink(missing_ok=True)
-            except OSError:
-                current_app.logger.warning("Could not remove rejected clip artifact: %s", artifact.name)
-        clip.output_path = None
-        clip.editorial_status = "rejected"
-        db.session.commit()
-        raise SourceAuthorizationRevoked("La fuente no tiene autorización válida")
     try:
+        # Rights lookup and evaluation must be inside the failure handler.
+        # A database error here must not leave a clip stuck in "processing".
+        source = db.session.get(MediaSource, clip.source_id)
+        if source is None or not assess_rights(
+            source.rights_status, source.permission_evidence
+        ).allowed:
+            raise SourceAuthorizationRevoked("La fuente no tiene autorización válida")
         # A retry must not reuse artifacts left by an earlier attempt. In
         # particular, a successful render without captions must not expose an
         # obsolete SRT or captioned MP4 from a previous run.

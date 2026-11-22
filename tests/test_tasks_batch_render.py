@@ -35,6 +35,8 @@ def batch_context(monkeypatch):
         SimpleNamespace(rights_status="owned", permission_evidence="test-owned-video")
         if model is MediaSource else previous_get(model, identifier)
     ))
+    from app.services import daily_review
+    monkeypatch.setattr(daily_review, "reserve_review_slot", lambda clip_id: 1)
     return statuses, seen, rollbacks
 
 
@@ -53,7 +55,7 @@ def test_batch_processes_independently_without_publishing(monkeypatch, batch_con
     assert result == {
         "rendered_clip_ids": [1, 3],
         "failed_clip_ids": [2],
-        "skipped_clip_ids": [], "unauthorized_clip_ids": [],
+        "skipped_clip_ids": [], "unauthorized_clip_ids": [], "deferred_clip_ids": [],
     }
     assert len(rollbacks) == 1
     assert "private" not in repr(result)
@@ -62,7 +64,7 @@ def test_batch_processes_independently_without_publishing(monkeypatch, batch_con
 def test_batch_accepts_single_clip(monkeypatch, batch_context):
     monkeypatch.setattr(clip_processor, "process_clip", lambda clip_id: None)
     assert render_clip_batch_task([7]) == {
-        "rendered_clip_ids": [7], "failed_clip_ids": [], "skipped_clip_ids": [], "unauthorized_clip_ids": []
+        "rendered_clip_ids": [7], "failed_clip_ids": [], "skipped_clip_ids": [], "unauthorized_clip_ids": [], "deferred_clip_ids": []
     }
 
 
@@ -75,7 +77,7 @@ def test_batch_skips_protected_or_missing_clips(monkeypatch, batch_context, stat
     statuses[2] = status
     monkeypatch.setattr(clip_processor, "process_clip", lambda clip_id: seen.append(clip_id))
     assert render_clip_batch_task([1, 2, 3]) == {
-        "rendered_clip_ids": [1, 3], "failed_clip_ids": [], "skipped_clip_ids": [2], "unauthorized_clip_ids": []
+        "rendered_clip_ids": [1, 3], "failed_clip_ids": [], "skipped_clip_ids": [2], "unauthorized_clip_ids": [], "deferred_clip_ids": []
     }
     assert seen == [1, 3]
 
@@ -86,7 +88,7 @@ def test_batch_allows_explicit_retry_of_failed_clips(monkeypatch, batch_context)
     monkeypatch.setattr(clip_processor, "process_clip", lambda clip_id: seen.append(clip_id))
     result = render_clip_batch_task([2])
     assert result == {
-        "rendered_clip_ids": [2], "failed_clip_ids": [], "skipped_clip_ids": [], "unauthorized_clip_ids": []
+        "rendered_clip_ids": [2], "failed_clip_ids": [], "skipped_clip_ids": [], "unauthorized_clip_ids": [], "deferred_clip_ids": []
     }
     assert seen == [2]
 
@@ -198,7 +200,7 @@ def test_batch_mixed_rights_keeps_authorized_rendering(monkeypatch, batch_contex
     assert seen == [1, 3]
     assert result == {
         "rendered_clip_ids": [1, 3], "failed_clip_ids": [],
-        "skipped_clip_ids": [], "unauthorized_clip_ids": [2],
+        "skipped_clip_ids": [], "unauthorized_clip_ids": [2], "deferred_clip_ids": [],
     }
 
 

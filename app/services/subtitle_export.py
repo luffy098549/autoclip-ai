@@ -1,4 +1,6 @@
 """Export original Whisper transcript segments to a sidecar .srt file."""
+import os
+import tempfile
 from pathlib import Path
 from ..models import db, Clip, TranscriptSegment
 from .subtitles import build_srt
@@ -29,5 +31,17 @@ def export_clip_srt(clip_id: int, output_path: str | Path) -> Path | None:
         return None
     dest = Path(output_path)
     dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(content, encoding="utf-8")
+    # A failed write must not leave a truncated SRT for render workers.
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=dest.parent,
+            prefix=".autoclip-srt-", suffix=".tmp", delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(content)
+        os.replace(temporary, dest)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
     return dest

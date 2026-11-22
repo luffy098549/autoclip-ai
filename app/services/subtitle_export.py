@@ -21,7 +21,7 @@ def export_clip_srt(clip_id: int, output_path: str | Path) -> Path | None:
     sub = [{"start": max(0, row.start_seconds - clip.start_seconds),
             "end": min(duration, row.end_seconds - clip.start_seconds),
             "text": row.text} for row in rows]
-    sub = [row for row in sub if row["end"] > row["start"] and str(row["text"] or "").replace("\\x00", "").strip()]
+    sub = [row for row in sub if row["end"] > row["start"] and str(row["text"] or "").replace(chr(0), "").strip()]
     if not sub:
         return None
     # Whitespace-only transcript segments produce no SRT cues. Do not create

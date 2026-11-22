@@ -41,6 +41,13 @@ def test_renderer_cannot_replace_clip_path_with_unrelated_file(monkeypatch, tmp_
             monkeypatch.setattr(
                 "app.services.clip_processor.create_local_clip", wrong_path
             )
+            def subtitle_export_must_not_run(*args, **kwargs):
+                pytest.fail("Subtitle export ran before renderer path validation")
+
+            monkeypatch.setattr(
+                "app.services.subtitle_export.export_clip_srt",
+                subtitle_export_must_not_run,
+            )
             with pytest.raises(ValueError, match="unexpected output path"):
                 process_clip(clip_id)
             db.session.expire_all()

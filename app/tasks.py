@@ -113,7 +113,7 @@ def render_clip_batch_task(clip_ids):
         raise ValueError("Duplicate clip IDs")
 
     from . import create_app
-    from .services.clip_processor import process_clip, ClipNotEligibleError
+    from .services.clip_processor import process_clip, ClipNotEligibleError, SourceAuthorizationRevoked
     from .models import db, Clip, MediaSource
     from .services.rights import assess_rights
 

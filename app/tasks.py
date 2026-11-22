@@ -116,12 +116,14 @@ def render_clip_batch_task(clip_ids):
     from .services.clip_processor import process_clip, ClipNotEligibleError, SourceAuthorizationRevoked
     from .models import db, Clip, MediaSource
     from .services.rights import assess_rights
+    from .services.daily_review import reserve_review_slot
 
     app = create_app()
     completed = []
     failed = []
     skipped = []
     unauthorized = []
+    deferred = []
     with app.app_context():
         for clip_id in clip_ids:
             try:
@@ -136,6 +138,11 @@ def render_clip_batch_task(clip_ids):
                     source.rights_status, source.permission_evidence
                 ).allowed:
                     unauthorized.append(clip_id)
+                    continue
+                # Share the same persistent five-per-day review budget as
+                # automatic analysis. A batch must not bypass that limit.
+                if reserve_review_slot(clip_id) is None:
+                    deferred.append(clip_id)
                     continue
                 process_clip(clip_id)
             except ClipNotEligibleError:
@@ -160,4 +167,5 @@ def render_clip_batch_task(clip_ids):
         "failed_clip_ids": failed,
         "skipped_clip_ids": skipped,
         "unauthorized_clip_ids": unauthorized,
+        "deferred_clip_ids": deferred,
     }

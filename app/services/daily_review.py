@@ -20,8 +20,8 @@ def reserve_review_slot(clip_id: int, now: datetime | None = None) -> int | None
     Caller must have verified clip/source authorization. This function commits
     the reservation independently of later video processing.
     """
-    if clip_id <= 0:
-        raise ValueError("clip_id must be positive")
+    if type(clip_id) is not int or not 0 < clip_id <= (2**63 - 1):
+        raise ValueError("clip_id must be a positive database integer")
     instant = now or datetime.now(timezone.utc)
     if instant.tzinfo is None or instant.utcoffset() is None:
         raise ValueError("now must be timezone-aware")

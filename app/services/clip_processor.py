@@ -6,6 +6,10 @@ from .rights import assess_rights
 from ..pipeline import create_local_clip
 
 
+class SourceAuthorizationRevoked(PermissionError):
+    """Source rights were revoked; this failure must never be retried."""
+
+
 class ClipNotEligibleError(RuntimeError):
     """Another worker claimed the clip, or its status forbids rendering."""
 
@@ -61,7 +65,7 @@ def process_clip(clip_id: int):
         # source from the database before exposing a completed render.
         db.session.expire(source)
         if not assess_rights(source.rights_status, source.permission_evidence).allowed:
-            raise PermissionError("Source authorization revoked during rendering")
+            raise SourceAuthorizationRevoked("Source authorization revoked during rendering")
         clip.editorial_status = "ready"
         db.session.commit()
         return info
@@ -82,7 +86,7 @@ def process_clip(clip_id: int):
         # Keep the clip rejected so recovery jobs cannot retry it as a
         # transient failure without a fresh rights review.
         clip.editorial_status = "rejected" if isinstance(
-            error, PermissionError
+            error, SourceAuthorizationRevoked
         ) else "failed"
         db.session.commit()
         raise

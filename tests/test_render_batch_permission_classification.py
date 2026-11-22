@@ -1,8 +1,7 @@
 """Batch rendering must distinguish filesystem failures from rights revocation."""
-from pathlib import Path
-
 import pytest
 
+import app as app_module
 from app import create_app
 from app.models import db, Clip, MediaSource
 from app import tasks
@@ -36,7 +35,7 @@ def test_batch_classifies_render_permission_failures(tmp_path, monkeypatch, erro
         db.session.commit()
         clip_id = clip.id
 
-        monkeypatch.setattr(tasks, "create_app", lambda: app, raising=False)
+        monkeypatch.setattr(app_module, "create_app", lambda: app)
         monkeypatch.setattr(clip_processor, "process_clip", lambda _id: (_ for _ in ()).throw(error))
         result = tasks.render_clip_batch_task([clip_id])
         assert result[expected_key] == [clip_id]

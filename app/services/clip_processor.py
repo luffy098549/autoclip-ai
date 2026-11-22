@@ -44,7 +44,7 @@ def process_clip(clip_id: int):
         clip.output_path = None
         clip.editorial_status = "rejected"
         db.session.commit()
-        raise PermissionError("La fuente no tiene autorización válida")
+        raise SourceAuthorizationRevoked("La fuente no tiene autorización válida")
     try:
         # A retry must not reuse artifacts left by an earlier attempt. In
         # particular, a successful render without captions must not expose an

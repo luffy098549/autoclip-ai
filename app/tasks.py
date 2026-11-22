@@ -39,7 +39,17 @@ def render_clip_task(clip_id: int):
             return {"status": "unauthorized", "clip_id": clip_id}
         if reserve_review_slot(clip_id) is None:
             return {"status": "deferred", "clip_id": clip_id}
-        return process_clip(clip_id)
+        # The claim can race another worker, or rights may be revoked while
+        # FFmpeg runs. Keep the single-worker result contract explicit.
+        from .services.clip_processor import ClipNotEligibleError, SourceAuthorizationRevoked
+        try:
+            return process_clip(clip_id)
+        except ClipNotEligibleError:
+            db.session.rollback()
+            return {"status": "skipped", "clip_id": clip_id}
+        except SourceAuthorizationRevoked:
+            db.session.rollback()
+            return {"status": "unauthorized", "clip_id": clip_id}
 
 
 @celery_app.task(name="autoclip.analyze_source_task")

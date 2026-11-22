@@ -36,7 +36,9 @@ def build_srt(segments: list[dict]) -> str:
         if start_stamp == end_stamp:
             raise ValueError("Subtitle interval is too short for SRT millisecond precision")
         # Keep user text within one cue; blank lines could impersonate SRT blocks.
-        text = " ".join(str(segment.get("text") or "").replace("\x00", "").split())
+        raw_text = segment.get("text")
+        # Provider metadata must not be stringified into fabricated captions.
+        text = " ".join(raw_text.replace("\x00", "").split()) if isinstance(raw_text, str) else ""
         if not text:
             continue
         blocks.append(f"{len(blocks) + 1}\n{start_stamp} --> {end_stamp}\n{text}")

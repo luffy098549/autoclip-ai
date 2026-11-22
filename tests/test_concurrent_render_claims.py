@@ -19,6 +19,8 @@ def _setup(monkeypatch):
         lambda model, item_id: clips.get(item_id) if model is models.Clip else source,
     )
     monkeypatch.setattr(rights, "assess_rights", lambda *args: SimpleNamespace(allowed=True))
+    from app.services import daily_review
+    monkeypatch.setattr(daily_review, "reserve_review_slot", lambda clip_id: clip_id)
     attempts = []
 
     def render(clip_id):

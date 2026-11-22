@@ -41,7 +41,7 @@ def analyze_source_task(source_id: int):
         result = analyze_source(source_id)
         if app.config.get("AUTO_RENDER_ENABLED"):
             from .models import db, Clip
-            from .services.clip_processor import process_clip, ClipNotEligibleError
+            from .services.clip_processor import process_clip, ClipNotEligibleError, SourceAuthorizationRevoked
             from .services.daily_review import reserve_review_slot
             from .services.rights import assess_rights
             from .models import MediaSource
@@ -68,8 +68,8 @@ def analyze_source_task(source_id: int):
                 except ClipNotEligibleError:
                     db.session.rollback()
                     result.setdefault("skipped_clip_ids", []).append(clip_id)
-                except PermissionError:
-                    # Rights can be revoked between preflight and rendering.
+                except SourceAuthorizationRevoked:
+                    # Rights can be revoked between preflight and rendering; filesystem permission errors are ordinary failures.
                     # Preserve the distinction from a transient encoder error.
                     db.session.rollback()
                     unauthorized.append(clip_id)
@@ -142,7 +142,7 @@ def render_clip_batch_task(clip_ids):
                 # A competing worker claimed the clip after preflight.
                 db.session.rollback()
                 skipped.append(clip_id)
-            except PermissionError:
+            except SourceAuthorizationRevoked:
                 # Authorization may be revoked during FFmpeg processing, after
                 # the initial source check. Report it as unauthorized, not as
                 # an ordinary encoder failure, and continue the batch.

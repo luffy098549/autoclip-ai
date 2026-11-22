@@ -50,3 +50,45 @@ def test_export_skips_blank_transcripts(tmp_path, texts, expected_cues):
             assert text.count(" --> ") == expected_cues
         db.session.remove()
         db.drop_all()
+
+def test_export_replace_failure_preserves_existing_sidecar(tmp_path, monkeypatch):
+    from app.services import subtitle_export
+
+    app = create_app({
+        "TESTING": True,
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "MEDIA_ROOT": str(tmp_path),
+    })
+    with app.app_context():
+        db.create_all()
+        source = MediaSource(
+            source_uri=str(tmp_path / "owned.mp4"),
+            rights_status="owned",
+            permission_evidence="original media",
+        )
+        db.session.add(source)
+        db.session.flush()
+        clip = Clip(source_id=source.id, start_seconds=0, end_seconds=10)
+        db.session.add_all([
+            clip,
+            TranscriptSegment(
+                source_id=source.id, start_seconds=1,
+                end_seconds=3, text="New subtitle",
+            ),
+        ])
+        db.session.commit()
+        destination = tmp_path / "clip.srt"
+        destination.write_text("previous valid content", encoding="utf-8")
+
+        def fail_replace(source_path, destination_path):
+            assert destination_path == destination
+            assert source_path.read_text(encoding="utf-8")
+            raise OSError("simulated replacement failure")
+
+        monkeypatch.setattr(subtitle_export.os, "replace", fail_replace)
+        with pytest.raises(OSError, match="simulated replacement failure"):
+            export_clip_srt(clip.id, destination)
+        assert destination.read_text(encoding="utf-8") == "previous valid content"
+        assert not list(tmp_path.glob(".autoclip-srt-*"))
+        db.session.remove()
+        db.drop_all()

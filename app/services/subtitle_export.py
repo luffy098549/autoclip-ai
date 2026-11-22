@@ -22,6 +22,9 @@ def export_clip_srt(clip_id: int, output_path: str | Path) -> Path | None:
             "end": min(duration, row.end_seconds - clip.start_seconds),
             "text": row.text} for row in rows]
     sub = [row for row in sub if row["end"] > row["start"] and str(row["text"] or "").replace(chr(0), "").strip()]
+    # SRT stores millisecond timestamps. Skip cues that round to the same
+    # millisecond rather than aborting export of other valid speech.
+    sub = [row for row in sub if round(row["start"] * 1000) != round(row["end"] * 1000)]
     if not sub:
         return None
     # Whitespace-only transcript segments produce no SRT cues. Do not create

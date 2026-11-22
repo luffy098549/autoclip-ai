@@ -49,13 +49,13 @@ def process_clip(clip_id: int):
             artifact.unlink(missing_ok=True)
         info = create_local_clip(source.source_uri, target, start=clip.start_seconds,
                                  end=clip.end_seconds, authorized=True)
-        from .subtitle_export import export_clip_srt
-        subtitle_path = export_clip_srt(clip.id, subtitles)
-        # The encoder is only authorized to write the clip-specific target.
-        # Never persist or return a different path supplied by a renderer.
+        # Validate the renderer result before generating any downstream assets.
+        # An unexpected path must not trigger transcription or subtitle export.
         rendered_path = Path(info["path"]).resolve()
         if rendered_path != target.resolve():
             raise ValueError("Renderer returned an unexpected output path")
+        from .subtitle_export import export_clip_srt
+        subtitle_path = export_clip_srt(clip.id, subtitles)
         clip.output_path = str(target)
         info["path"] = str(target)
         if subtitle_path and current_app.config.get("AUTO_CAPTION_ENABLED"):

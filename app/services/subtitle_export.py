@@ -22,7 +22,12 @@ def export_clip_srt(clip_id: int, output_path: str | Path) -> Path | None:
     sub = [row for row in sub if row["end"] > row["start"]]
     if not sub:
         return None
+    # Whitespace-only transcript segments produce no SRT cues. Do not create
+    # an empty sidecar or request FFmpeg to burn unusable subtitles.
+    content = build_srt(sub)
+    if not content:
+        return None
     dest = Path(output_path)
     dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(build_srt(sub), encoding="utf-8")
+    dest.write_text(content, encoding="utf-8")
     return dest

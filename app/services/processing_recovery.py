@@ -31,3 +31,23 @@ def find_stale_processing_clips(*, now=None, older_than=timedelta(hours=2), limi
         .all()
     )
     return [row[0] for row in rows]
+
+
+def find_untracked_processing_clips(*, limit=100):
+    """Find processing records lacking a start timestamp (legacy or inconsistent).
+
+    Diagnostic only: never reset, enqueue, or assume that a worker is dead.
+    """
+    if type(limit) is not int or not 1 <= limit <= 1000:
+        raise ValueError("limit must be between 1 and 1000")
+    rows = (
+        db.session.query(Clip.id)
+        .filter(
+            Clip.editorial_status == "processing",
+            Clip.processing_started_at.is_(None),
+        )
+        .order_by(Clip.id.asc())
+        .limit(limit)
+        .all()
+    )
+    return [row[0] for row in rows]

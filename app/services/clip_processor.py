@@ -63,7 +63,7 @@ def process_clip(clip_id: int):
         if rendered_path != target.resolve():
             raise ValueError("Renderer returned an unexpected output path")
         # Never mark a clip ready when an encoder claims success without an artifact.
-        if not target.is_file() or target.stat().st_size == 0:
+        if target.is_symlink() or not target.is_file() or target.stat().st_size == 0:
             raise ValueError("Renderer did not produce a nonempty clip artifact")
         from .subtitle_export import export_clip_srt
         subtitle_path = export_clip_srt(clip.id, subtitles)
@@ -74,7 +74,7 @@ def process_clip(clip_id: int):
             burn_subtitles(info["path"], subtitle_path, captioned)
             # Caption encoders may return successfully without writing playable media.
             # Never expose a missing/empty captioned file as a ready clip.
-            if not captioned.is_file() or captioned.stat().st_size == 0:
+            if captioned.is_symlink() or not captioned.is_file() or captioned.stat().st_size == 0:
                 raise ValueError("Caption renderer did not produce a nonempty clip artifact")
             clip.output_path = str(captioned)
             info["captioned_path"] = str(captioned)

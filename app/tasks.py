@@ -14,17 +14,47 @@ def heartbeat():
     return {"service": "autoclip", "status": "alive"}
 
 
+def _require_positive_id(value, label):
+    """Reject malformed task identifiers before opening app/database resources."""
+    if type(value) is not int or not 0 < value <= (2**63 - 1):
+        raise ValueError(f"{label} must be a positive integer")
+    return value
+
+
 @celery_app.task(name="autoclip.render_clip_task")
 def render_clip_task(clip_id: int):
+    _require_positive_id(clip_id, "Clip ID")
     from . import create_app
     from .services.clip_processor import process_clip
+    from .services.daily_review import reserve_review_slot
+    from .services.rights import assess_rights
+    from .models import db, Clip, MediaSource
     app = create_app()
     with app.app_context():
-        return process_clip(clip_id)
+        clip = db.session.get(Clip, clip_id)
+        if clip is None or clip.editorial_status not in {"draft", "failed", "awaiting_worker", "queued"}:
+            return {"status": "skipped", "clip_id": clip_id}
+        source = db.session.get(MediaSource, clip.source_id)
+        if source is None or not assess_rights(source.rights_status, source.permission_evidence).allowed:
+            return {"status": "unauthorized", "clip_id": clip_id}
+        if reserve_review_slot(clip_id) is None:
+            return {"status": "deferred", "clip_id": clip_id}
+        # The claim can race another worker, or rights may be revoked while
+        # FFmpeg runs. Keep the single-worker result contract explicit.
+        from .services.clip_processor import ClipNotEligibleError, SourceAuthorizationRevoked
+        try:
+            return process_clip(clip_id)
+        except ClipNotEligibleError:
+            db.session.rollback()
+            return {"status": "skipped", "clip_id": clip_id}
+        except SourceAuthorizationRevoked:
+            db.session.rollback()
+            return {"status": "unauthorized", "clip_id": clip_id}
 
 
 @celery_app.task(name="autoclip.analyze_source_task")
 def analyze_source_task(source_id: int):
+    _require_positive_id(source_id, "Source ID")
     from . import create_app
     from .services.analyzer import analyze_source
     app = create_app()
@@ -32,39 +62,52 @@ def analyze_source_task(source_id: int):
         result = analyze_source(source_id)
         if app.config.get("AUTO_RENDER_ENABLED"):
             from .models import db, Clip
-            from .services.clip_processor import process_clip
+            from .services.clip_processor import process_clip, ClipNotEligibleError, SourceAuthorizationRevoked
             from .services.daily_review import reserve_review_slot
             from .services.rights import assess_rights
             from .models import MediaSource
             successes = []
             failures = []
+            unauthorized = []
             for clip_id in result["clip_ids"]:
                 clip = db.session.get(Clip, clip_id)
                 if clip and clip.editorial_status == "ready":
                     successes.append(clip_id)
                     continue
                 try:
-                    if not clip or clip.editorial_status in {"rejected", "processing", "approved", "published"}:
+                    if not clip or clip.editorial_status not in {"draft", "failed", "awaiting_worker", "queued"}:
                         continue
                     source = db.session.get(MediaSource, clip.source_id)
                     if source is None or not assess_rights(source.rights_status, source.permission_evidence).allowed:
-                        failures.append(clip_id)
+                        unauthorized.append(clip_id)
                         continue
                     if reserve_review_slot(clip_id) is None:
                         result.setdefault("deferred_clip_ids", []).append(clip_id)
                         continue
                     process_clip(clip_id)
                     successes.append(clip_id)
+                except ClipNotEligibleError:
+                    db.session.rollback()
+                    result.setdefault("skipped_clip_ids", []).append(clip_id)
+                except SourceAuthorizationRevoked:
+                    # Rights can be revoked between preflight and rendering; filesystem permission errors are ordinary failures.
+                    # Preserve the distinction from a transient encoder error.
+                    db.session.rollback()
+                    unauthorized.append(clip_id)
                 except Exception:
-                    # process_clip persists a failed state. Do not abort other candidates.
+                    # A failed commit or render can invalidate the session; recover
+                    # before looking up the next candidate in this batch.
+                    db.session.rollback()
                     failures.append(clip_id)
             result["rendered_clip_ids"] = successes
             result["failed_clip_ids"] = failures
+            result["unauthorized_clip_ids"] = unauthorized
         return result
 
 
 @celery_app.task(name="autoclip.youtube_metadata_task")
 def youtube_metadata_task(streamer_id: int):
+    _require_positive_id(streamer_id, "Streamer ID")
     import os
     from . import create_app
     from .services.competitor_sync import sync_youtube_channel
@@ -74,3 +117,76 @@ def youtube_metadata_task(streamer_id: int):
     app = create_app()
     with app.app_context():
         return sync_youtube_channel(streamer_id, key)
+
+
+@celery_app.task(name="autoclip.render_clip_batch_task")
+def render_clip_batch_task(clip_ids):
+    """Render up to five existing clip records for manual review; never publish.
+
+    Each clip is processed independently so one failed render cannot prevent
+    the remaining authorized clips from being attempted.
+    """
+    if not isinstance(clip_ids, (list, tuple)) or not 1 <= len(clip_ids) <= 5:
+        raise ValueError("Provide between one and five clip IDs")
+    if any(type(clip_id) is not int or not 0 < clip_id <= (2**63 - 1) for clip_id in clip_ids):
+        raise ValueError("Clip IDs must be positive integers")
+    if len(set(clip_ids)) != len(clip_ids):
+        raise ValueError("Duplicate clip IDs")
+
+    from . import create_app
+    from .services.clip_processor import process_clip, ClipNotEligibleError, SourceAuthorizationRevoked
+    from .models import db, Clip, MediaSource
+    from .services.rights import assess_rights
+    from .services.daily_review import reserve_review_slot
+
+    app = create_app()
+    completed = []
+    failed = []
+    skipped = []
+    unauthorized = []
+    deferred = []
+    with app.app_context():
+        for clip_id in clip_ids:
+            try:
+                clip = db.session.get(Clip, clip_id)
+                # Never overwrite an already approved/published clip, or race
+                # another worker currently processing the same record.
+                if clip is None or clip.editorial_status not in {"draft", "failed", "awaiting_worker", "queued"}:
+                    skipped.append(clip_id)
+                    continue
+                source = db.session.get(MediaSource, clip.source_id)
+                if source is None or not assess_rights(
+                    source.rights_status, source.permission_evidence
+                ).allowed:
+                    unauthorized.append(clip_id)
+                    continue
+                # Share the same persistent five-per-day review budget as
+                # automatic analysis. A batch must not bypass that limit.
+                if reserve_review_slot(clip_id) is None:
+                    deferred.append(clip_id)
+                    continue
+                process_clip(clip_id)
+            except ClipNotEligibleError:
+                # A competing worker claimed the clip after preflight.
+                db.session.rollback()
+                skipped.append(clip_id)
+            except SourceAuthorizationRevoked:
+                # Authorization may be revoked during FFmpeg processing, after
+                # the initial source check. Report it as unauthorized, not as
+                # an ordinary encoder failure, and continue the batch.
+                db.session.rollback()
+                unauthorized.append(clip_id)
+            except Exception:
+                # A failure in one clip must not poison the SQLAlchemy session
+                # used for the remaining independent renders.
+                db.session.rollback()
+                failed.append(clip_id)
+            else:
+                completed.append(clip_id)
+    return {
+        "rendered_clip_ids": completed,
+        "failed_clip_ids": failed,
+        "skipped_clip_ids": skipped,
+        "unauthorized_clip_ids": unauthorized,
+        "deferred_clip_ids": deferred,
+    }

@@ -6,6 +6,43 @@ document.addEventListener("DOMContentLoaded",()=>{
   const filter=document.getElementById("library-filter");
   const count=document.getElementById("library-count");
   let clips=[];
+  let reloadSequence = 0;
+  const selectedForBatch = new Set();
+  let transferredSelection = "";
+  const batchInput = document.getElementById("batch-render-ids");
+  const batchFeedback = document.getElementById("batch-render-feedback");
+  const eligible = new Set(["draft", "failed", "awaiting_worker"]);
+  const selectionBar = document.createElement("div");
+  selectionBar.className = "library-toolbar";
+  const selectionStatus = document.createElement("span");
+  selectionStatus.setAttribute("aria-live", "polite");
+  const transferButton = document.createElement("button");
+  transferButton.type = "button";
+  transferButton.className = "button ghost";
+  transferButton.textContent = "Enviar selección al formulario";
+  selectionBar.append(selectionStatus, transferButton);
+  if (batchInput) gallery.before(selectionBar);
+  function invalidateTransferredSelection() {
+    if (!batchInput || !transferredSelection) return;
+    // A changed checkbox selection must never leave a stale batch ready to submit.
+    if (batchInput.value === transferredSelection) {
+      batchInput.value = "";
+      if (batchFeedback) batchFeedback.textContent = "La selección cambió. Transfiere de nuevo los clips antes de procesar.";
+    }
+    transferredSelection = "";
+  }
+  function updateSelection() {
+    selectionStatus.textContent = selectedForBatch.size + " de 5 clips seleccionados";
+    transferButton.disabled = selectedForBatch.size === 0;
+  }
+  transferButton.addEventListener("click", () => {
+    if (!batchInput || selectedForBatch.size === 0) return;
+    batchInput.value = Array.from(selectedForBatch).join(", ");
+    transferredSelection = batchInput.value;
+    if (batchFeedback) batchFeedback.textContent = "Selección preparada. Confirma Procesar lote para encolarla.";
+    batchInput.focus();
+  });
+  updateSelection();
   const statusLabels={
     ready:"Listo",failed:"Fallido",processing:"Procesando",
     awaiting_worker:"En espera",queued:"En cola",draft:"Borrador",
@@ -27,6 +64,20 @@ document.addEventListener("DOMContentLoaded",()=>{
         !term||String(c.id).includes(term)||String(c.source_id).includes(term)
       );
     });
+    for (const id of selectedForBatch) {
+      if (!clips.some(c => c.id === id && eligible.has(c.status))) selectedForBatch.delete(id);
+    }
+    updateSelection();
+    // Never submit IDs that became ineligible after a library refresh.
+    if (batchInput && transferredSelection && batchInput.value === transferredSelection) {
+      const validIds = new Set(Array.from(selectedForBatch).map(String));
+      const transferredIds = transferredSelection.split(",").map(value => value.trim());
+      if (transferredIds.some(id => !validIds.has(id))) {
+        batchInput.value = "";
+        transferredSelection = "";
+        if (batchFeedback) batchFeedback.textContent = "La selección cambió. Vuelve a transferir los clips elegibles antes de procesar.";
+      }
+    }
     gallery.replaceChildren();
     count.textContent=matching.length+" clips mostrados";
     if(!matching.length){
@@ -69,17 +120,52 @@ document.addEventListener("DOMContentLoaded",()=>{
         }
         body.append(links);
       }
+      if (batchInput && eligible.has(item.status)) {
+        const label = node("label", undefined, "clip-meta");
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = selectedForBatch.has(item.id);
+        checkbox.setAttribute("aria-label", "Seleccionar clip " + item.id + " para lote");
+        checkbox.addEventListener("change", () => {
+          if (checkbox.checked && selectedForBatch.size >= 5) {
+            checkbox.checked = false;
+            selectionStatus.textContent = "Máximo cinco clips por lote.";
+            return;
+          }
+          if (checkbox.checked) selectedForBatch.add(item.id);
+          else selectedForBatch.delete(item.id);
+          invalidateTransferredSelection();
+          updateSelection();
+        });
+        label.append(checkbox, document.createTextNode(" Seleccionar para lote"));
+        body.append(label);
+      }
       card.append(top,body);
       gallery.append(card);
     });
   }
 
   async function reload(){
-    const response=await fetch("/api/clips",{credentials:"same-origin"});
-    if(!response.ok)throw new Error("No se pudo cargar la biblioteca");
-    const data=await response.json();
-    clips=data.items||[];
-    render();
+    const sequence = ++reloadSequence;
+    try {
+      const response=await fetch("/api/clips",{credentials:"same-origin"});
+      if(!response.ok)throw new Error("No se pudo cargar la biblioteca");
+      const data=await response.json();
+      // An older response must not overwrite newer clip statuses or selections.
+      if (sequence !== reloadSequence) return;
+      if (!data || !Array.isArray(data.items) || !data.items.every(item =>
+        item && Number.isSafeInteger(item.id) && item.id > 0 &&
+        Number.isSafeInteger(item.source_id) && item.source_id > 0 &&
+        typeof item.status === "string" &&
+        Number.isFinite(item.start) && Number.isFinite(item.end) &&
+        item.end > item.start
+      )) throw new Error("Respuesta inválida de la biblioteca");
+      clips=data.items;
+      render();
+    } catch (error) {
+      if (sequence !== reloadSequence) return;
+      throw error;
+    }
   }
   search.addEventListener("input",render);
   filter.addEventListener("change",render);

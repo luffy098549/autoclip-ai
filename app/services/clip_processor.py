@@ -1,42 +1,114 @@
 """Worker-safe clip processing. Requires prior source authorization."""
 from pathlib import Path
+from math import isfinite
+from datetime import datetime, timezone
 from flask import current_app
 from ..models import db, Clip, MediaSource
 from .rights import assess_rights
 from ..pipeline import create_local_clip
 
 
+class SourceAuthorizationRevoked(PermissionError):
+    """Source rights were revoked; this failure must never be retried."""
+
+
+class ClipNotEligibleError(RuntimeError):
+    """Another worker claimed the clip, or its status forbids rendering."""
+
+
 def process_clip(clip_id: int):
     clip = db.session.get(Clip, clip_id)
     if clip is None:
         raise ValueError("Clip no encontrado")
-    source = db.session.get(MediaSource, clip.source_id)
-    if source is None or not assess_rights(source.rights_status, source.permission_evidence).allowed:
-        clip.editorial_status = "rejected"
-        db.session.commit()
-        raise PermissionError("La fuente no tiene autorización válida")
-    clip.editorial_status = "processing"
-    db.session.commit()
+    # Reject corrupt/manual timing edits before claiming a worker slot or touching media.
+    # NaN/Infinity can bypass ordinary range comparisons and confuse FFmpeg.
+    if (not all(isinstance(value, (int, float)) and not isinstance(value, bool)
+                and isfinite(value) for value in (clip.start_seconds, clip.end_seconds))
+            or clip.start_seconds < 0 or clip.end_seconds <= clip.start_seconds):
+        raise ValueError("Invalid clip start/end times")
+    # Resolve output paths before claiming the record. A missing or invalid
+    # MEDIA_ROOT must not strand the clip in processing status.
     target = Path(current_app.config["MEDIA_ROOT"]) / "clips" / f"clip-{clip.id}.mp4"
+    subtitles = Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{clip.id}.srt"
+    captioned = target.with_name(f"clip-{clip.id}-captioned.mp4")
+    # Claim before touching editorial state: a stale worker must not reject a
+    # clip that another worker is already processing or has completed.
+    # Claim atomically to prevent concurrent workers overwriting one output.
+    claimed = db.session.query(Clip).filter(
+        Clip.id == clip_id,
+        Clip.editorial_status.in_(("draft", "failed", "awaiting_worker", "queued")),
+    ).update({Clip.editorial_status: "processing", Clip.processing_started_at: datetime.now(timezone.utc)}, synchronize_session=False)
+    db.session.commit()
+    if claimed != 1:
+        raise ClipNotEligibleError("Clip already processing or not eligible for rendering")
+    db.session.refresh(clip)
     try:
+        # Rights lookup and evaluation must be inside the failure handler.
+        # A database error here must not leave a clip stuck in "processing".
+        source = db.session.get(MediaSource, clip.source_id)
+        if source is None or not assess_rights(
+            source.rights_status, source.permission_evidence
+        ).allowed:
+            raise SourceAuthorizationRevoked("La fuente no tiene autorización válida")
+        # A retry must not reuse artifacts left by an earlier attempt. In
+        # particular, a successful render without captions must not expose an
+        # obsolete SRT or captioned MP4 from a previous run.
+        for artifact in (target, captioned, subtitles):
+            artifact.unlink(missing_ok=True)
         info = create_local_clip(source.source_uri, target, start=clip.start_seconds,
                                  end=clip.end_seconds, authorized=True)
+        # Validate the renderer result before generating any downstream assets.
+        # An unexpected path must not trigger transcription or subtitle export.
+        rendered_path = Path(info["path"]).resolve()
+        if rendered_path != target.resolve():
+            raise ValueError("Renderer returned an unexpected output path")
+        # Never mark a clip ready when an encoder claims success without an artifact.
+        if target.is_symlink() or not target.is_file() or target.stat().st_size == 0 or target.stat().st_nlink != 1:
+            raise ValueError("Renderer did not produce a nonempty clip artifact")
         from .subtitle_export import export_clip_srt
-        subtitles = Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{clip.id}.srt"
         subtitle_path = export_clip_srt(clip.id, subtitles)
-        clip.output_path = info["path"]
+        clip.output_path = str(target)
+        info["path"] = str(target)
         if subtitle_path and current_app.config.get("AUTO_CAPTION_ENABLED"):
             from .caption_burn import burn_subtitles
-            captioned = target.with_name(f"clip-{clip.id}-captioned.mp4")
             burn_subtitles(info["path"], subtitle_path, captioned)
+            # Caption encoders may return successfully without writing playable media.
+            # Never expose a missing/empty captioned file as a ready clip.
+            if captioned.is_symlink() or not captioned.is_file() or captioned.stat().st_size == 0 or captioned.stat().st_nlink != 1:
+                raise ValueError("Caption renderer did not produce a nonempty clip artifact")
             clip.output_path = str(captioned)
             info["captioned_path"] = str(captioned)
+            # Return the same playable artifact that the database exposes.
+            # Callers must not accidentally preview the uncaptioned render.
+            info["path"] = str(captioned)
+        # Authorization can be revoked while FFmpeg is running. Reload the
+        # source from the database before exposing a completed render.
+        db.session.expire(source)
+        if not assess_rights(source.rights_status, source.permission_evidence).allowed:
+            raise SourceAuthorizationRevoked("Source authorization revoked during rendering")
         clip.editorial_status = "ready"
+        clip.processing_started_at = None
         db.session.commit()
         return info
-    except Exception:
+    except Exception as error:
+        # A revoked or failed render must not leave generated media accessible
+        # on disk. Only remove paths derived from this clip id, never paths
+        # returned by an encoder or supplied by an external source.
+        for artifact in (target, captioned, subtitles):
+            try:
+                artifact.unlink(missing_ok=True)
+            except OSError:
+                current_app.logger.warning("Could not remove failed clip artifact: %s", artifact.name)
         db.session.rollback()
         clip = db.session.get(Clip, clip_id)
-        clip.editorial_status = "failed"
+        # A failed retry must never retain a previously rendered download path.
+        clip.output_path = None
+        clip.processing_started_at = None
+        # Revocation is an authorization decision, not an encoder failure.
+        # Keep the clip rejected so recovery jobs cannot retry it as a
+        # transient failure without a fresh rights review.
+        clip.editorial_status = "rejected" if isinstance(
+            error, SourceAuthorizationRevoked
+        ) else "failed"
         db.session.commit()
         raise

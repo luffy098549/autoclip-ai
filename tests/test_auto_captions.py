@@ -45,3 +45,5 @@ def test_auto_caption_processor_uses_sidecar_when_enabled(monkeypatch, tmp_path)
         assert saved.output_path.endswith("-captioned.mp4")
         assert Path(saved.output_path).is_file()
         assert result["captioned_path"]==saved.output_path
+        assert result["path"] == saved.output_path
+        assert Path(result["path"]).read_bytes() == b"captioned-placeholder"

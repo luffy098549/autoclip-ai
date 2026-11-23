@@ -1,5 +1,6 @@
 """Optional local speech-to-text via faster-whisper. No cloud upload."""
 import os
+import math
 from pathlib import Path
 
 
@@ -24,8 +25,28 @@ def transcribe_file(path: str, *, model_size: str | None = None,
     segments, info = model.transcribe(str(source), vad_filter=True, beam_size=5)
     cleaned = []
     for seg in segments:
-        text = seg.text.strip()
-        if text and seg.end > seg.start:
-            cleaned.append({"start":round(float(seg.start), 3),
-                            "end":round(float(seg.end), 3), "text":text})
+        # Reject malformed and sub-millisecond cues before storing metadata.
+        try:
+            raw_start, raw_end = seg.start, seg.end
+            if isinstance(raw_start, bool) or isinstance(raw_end, bool):
+                continue
+            start, end = float(raw_start), float(raw_end)
+        except (AttributeError, TypeError, ValueError, OverflowError):
+            continue
+        if not (math.isfinite(start) and math.isfinite(end) and 0 <= start < end):
+            continue
+        # Very large finite seconds may overflow when converted to milliseconds.
+        scaled_start, scaled_end = start * 1000, end * 1000
+        if not (math.isfinite(scaled_start) and math.isfinite(scaled_end)):
+            continue
+        start_ms, end_ms = round(scaled_start), round(scaled_end)
+        if end_ms <= start_ms:
+            continue
+        raw_text = getattr(seg, "text", None)
+        if raw_text is None:
+            continue
+        text = str(raw_text).replace("\x00", "").strip()
+        if text:
+            cleaned.append({"start": start_ms / 1000,
+                            "end": end_ms / 1000, "text": text})
     return {"language":info.language or "unknown", "segments":cleaned}

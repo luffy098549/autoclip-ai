@@ -82,6 +82,8 @@ def sources():
             "id": x.id, "streamer_id": x.streamer_id, "rights": x.rights_status,
             "name": Path(x.source_uri).name, "created_at": x.acquired_at.isoformat()
         } for x in items])
+    if current_app.config.get("READ_ONLY_DEPLOYMENT", False):
+        return jsonify(error="La importación está desactivada en modo solo lectura"), 503
     file = request.files.get("file")
     if file is None or not file.filename:
         return jsonify(error="Selecciona un archivo de video"), 400
@@ -126,18 +128,35 @@ def sources():
 def clips():
     if request.method == "GET":
         items = Clip.query.order_by(Clip.id.desc()).limit(100).all()
+        source_ids = {c.source_id for c in items}
+        authorized_sources = {source.id for source in MediaSource.query.filter(
+            MediaSource.id.in_(source_ids)).all()
+            if assess_rights(source.rights_status, source.permission_evidence).allowed}
         return jsonify(items=[{
             "id": c.id, "source_id": c.source_id, "start": c.start_seconds,
             "end": c.end_seconds, "status": c.editorial_status, "score": c.score,
-            "has_subtitles": (Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{c.id}.srt").is_file()
+            "has_subtitles": (c.editorial_status == "ready" and c.source_id in authorized_sources and
+                              (Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{c.id}.srt").is_file())
         } for c in items])
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(error="Se requiere un objeto JSON válido"), 400
     try:
-        source_id = int(data.get("source_id"))
-        start = float(data.get("start"))
-        end = float(data.get("end"))
-    except (ValueError, TypeError):
-        return jsonify(error="source_id, start y end deben ser números"), 400
+        raw_id = data.get("source_id")
+        if (isinstance(raw_id, bool) or not isinstance(raw_id, (int, str))
+                or not str(raw_id).isascii() or not str(raw_id).isdecimal()):
+            raise ValueError("ID de fuente inválido")
+        source_id = int(raw_id)
+        if source_id <= 0:
+            raise ValueError("ID de fuente inválido")
+        raw_start, raw_end = data.get("start"), data.get("end")
+        if (isinstance(raw_start, bool) or isinstance(raw_end, bool)
+                or not isinstance(raw_start, (int, float))
+                or not isinstance(raw_end, (int, float))):
+            raise ValueError("Los tiempos deben ser números")
+        start, end = float(raw_start), float(raw_end)
+    except (ValueError, TypeError, OverflowError):
+        return jsonify(error="source_id, start y end deben ser números válidos"), 400
     if not (math.isfinite(start) and math.isfinite(end) and 0 <= start < end <= start + 180):
         return jsonify(error="Duración inválida: máximo 180 segundos"), 400
     source = db.session.get(MediaSource, source_id)
@@ -165,6 +184,43 @@ def clips():
             db.session.rollback()  # Still awaiting_worker: run locally when broker is down.
     return jsonify(id=obj.id, status=obj.editorial_status,
                    message="Solicitud de recorte registrada. Comprueba el estado en Biblioteca."), 202
+
+
+@api_bp.post("/clips/render-batch")
+@admin_only
+def queue_clip_batch():
+    """Queue up to five authorized, pending clips for manual review only."""
+    if not current_app.config.get("PROCESSING_ENABLED"):
+        return jsonify(error="Procesamiento desactivado"), 503
+    data = request.get_json(silent=True)
+    ids = data.get("clip_ids") if isinstance(data, dict) else None
+    if (not isinstance(ids, list) or not 1 <= len(ids) <= 5
+            or any(type(item) is not int or item <= 0 for item in ids)
+            or len(set(ids)) != len(ids)):
+        return jsonify(error="clip_ids debe contener entre 1 y 5 enteros positivos únicos"), 400
+
+    clips_by_id = {clip.id: clip for clip in Clip.query.filter(Clip.id.in_(ids)).all()}
+    if len(clips_by_id) != len(ids):
+        return jsonify(error="Uno o más clips no existen"), 404
+    if any(clips_by_id[item].editorial_status not in
+           {"draft", "failed", "awaiting_worker"} for item in ids):
+        return jsonify(error="Uno o más clips no están pendientes de procesamiento"), 409
+
+    source_ids = {clip.source_id for clip in clips_by_id.values()}
+    sources = {source.id: source for source in
+               MediaSource.query.filter(MediaSource.id.in_(source_ids)).all()}
+    if any((source := sources.get(clips_by_id[item].source_id)) is None
+           or not assess_rights(source.rights_status, source.permission_evidence).allowed
+           for item in ids):
+        return jsonify(error="Una o más fuentes carecen de autorización válida"), 403
+
+    from ..tasks import render_clip_batch_task
+    try:
+        task = render_clip_batch_task.delay(ids)
+    except Exception:
+        return jsonify(error="Worker o Redis no disponible"), 503
+    return jsonify(task_id=task.id, clip_ids=ids,
+                   message="Lote enviado para procesamiento y revisión manual; no publica contenido"), 202
 
 
 @api_bp.post("/sources/<int:source_id>/analyze")
@@ -210,16 +266,20 @@ def download_clip(clip_id):
 @admin_only
 def download_subtitles(clip_id):
     clip = db.session.get(Clip, clip_id)
-    if not clip:
-        return jsonify(error="Clip inexistente"), 404
+    if not clip or clip.editorial_status != "ready":
+        return jsonify(error="Subtítulos no disponibles para este clip"), 404
     source = db.session.get(MediaSource, clip.source_id)
     if source is None or not assess_rights(source.rights_status, source.permission_evidence).allowed:
         return jsonify(error="No se pueden descargar subtítulos sin autorización"), 403
-    path = Path(current_app.config["MEDIA_ROOT"]) / "subtitles" / f"clip-{clip_id}.srt"
-    if not path.is_file():
+    subtitles_root = (Path(current_app.config["MEDIA_ROOT"]) / "subtitles").resolve()
+    path = (subtitles_root / f"clip-{clip_id}.srt").resolve()
+    if path.parent != subtitles_root or not path.is_file() or path.suffix.lower() != ".srt":
         return jsonify(error="Subtítulos no disponibles"), 404
-    return send_file(path, as_attachment=True, download_name=f"autoclip-{clip.id}.srt",
-                     mimetype="application/x-subrip")
+    response = send_file(path, as_attachment=True,
+                         download_name=f"autoclip-{clip.id}.srt",
+                         mimetype="application/x-subrip")
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
 
 
 @api_bp.route("/analytics", methods=["GET", "POST"])
@@ -338,6 +398,8 @@ def source_transcript(source_id):
     source = db.session.get(MediaSource, source_id)
     if not source:
         return jsonify(error="Fuente inexistente"), 404
+    if not assess_rights(source.rights_status, source.permission_evidence).allowed:
+        return jsonify(error="Fuente sin autorización válida"), 403
     from ..models import TranscriptSegment
     entries = TranscriptSegment.query.filter_by(source_id=source.id).order_by(
         TranscriptSegment.start_seconds.asc(), TranscriptSegment.id.asc()

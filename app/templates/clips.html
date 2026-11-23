@@ -48,6 +48,17 @@
   <p id="daily-review-status" role="status" aria-live="polite">Cargando selección…</p>
   <div id="daily-review-gallery" class="daily-review-grid"></div>
 </section>
+<section class="panel" id="batch-render-panel">
+  <div class="section-heading"><h2>Procesar clips pendientes por lote</h2><span class="tag">Máximo 5 · revisión manual</span></div>
+  <p class="muted">Introduce hasta cinco IDs de clips pendientes, separados por comas. Solo se procesan fuentes autorizadas; esta acción no publica videos.</p>
+  <form id="batch-render-form" class="editor-form">
+    <label>IDs de clips<input id="batch-render-ids" name="clip_ids" inputmode="numeric" placeholder="12, 13, 14" required maxlength="80"></label>
+    <button class="button" type="submit">Procesar lote</button>
+  </form>
+  <p id="batch-render-feedback" role="status" aria-live="polite"></p>
+  <button class="button ghost" type="button" id="batch-render-check" hidden>Consultar estado</button>
+</section>
+<script src="{{ url_for('static', filename='js/batch-render.js') }}" defer></script>
 <section class="panel"><h3>Estado detallado</h3><div id="clip-list" class="data-list"></div></section>
 {% else %}
 <section class="panel"><h2>Biblioteca de clips</h2><p class="muted">Inicia sesión como administrador para importar material y preparar videos.</p><a class="button" href="{{ url_for('auth.login') }}">Iniciar sesión</a></section>

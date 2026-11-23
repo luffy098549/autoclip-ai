@@ -23,6 +23,8 @@ def test_initial_migration_sqlite(tmp_path):
         tables=set(inspect(db.engine).get_table_names())
         assert EXPECTED.issubset(tables)
         revision=db.session.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-        assert revision=="20261109_002"
+        assert revision=="20261122_003"
+        columns = {column["name"] for column in inspect(db.engine).get_columns("clips")}
+        assert "processing_started_at" in columns
         upgrade()  # applying migrations twice must be safe and idempotent
         assert db.session.execute(text("SELECT COUNT(*) FROM alembic_version")).scalar_one()==1

@@ -1,5 +1,6 @@
 """Worker-safe clip processing. Requires prior source authorization."""
 from pathlib import Path
+from math import isfinite
 from datetime import datetime, timezone
 from flask import current_app
 from ..models import db, Clip, MediaSource
@@ -19,6 +20,12 @@ def process_clip(clip_id: int):
     clip = db.session.get(Clip, clip_id)
     if clip is None:
         raise ValueError("Clip no encontrado")
+    # Reject corrupt/manual timing edits before claiming a worker slot or touching media.
+    # NaN/Infinity can bypass ordinary range comparisons and confuse FFmpeg.
+    if (not all(isinstance(value, (int, float)) and not isinstance(value, bool)
+                and isfinite(value) for value in (clip.start_seconds, clip.end_seconds))
+            or clip.start_seconds < 0 or clip.end_seconds <= clip.start_seconds):
+        raise ValueError("Invalid clip start/end times")
     # Resolve output paths before claiming the record. A missing or invalid
     # MEDIA_ROOT must not strand the clip in processing status.
     target = Path(current_app.config["MEDIA_ROOT"]) / "clips" / f"clip-{clip.id}.mp4"

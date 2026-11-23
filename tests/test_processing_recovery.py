@@ -91,3 +91,53 @@ def test_untracked_processing_clips_are_reported_read_only(recovery_app):
 def test_untracked_scan_rejects_invalid_limits(recovery_app, limit):
     with recovery_app.app_context(), pytest.raises(ValueError):
         find_untracked_processing_clips(limit=limit)
+
+
+def test_backlog_summary_counts_all_categories_without_writes(recovery_app):
+    from app.services.processing_recovery import summarize_processing_backlog
+
+    now = datetime(2026, 11, 23, 12, tzinfo=timezone.utc)
+    with recovery_app.app_context():
+        source = MediaSource(source_uri="owned-summary.mp4", rights_status="owned")
+        db.session.add(source)
+        db.session.flush()
+        cases = [
+            ("processing", now - timedelta(hours=4)),
+            ("processing", now - timedelta(hours=2)),
+            ("processing", now - timedelta(minutes=20)),
+            ("processing", None),
+            ("ready", now - timedelta(days=1)),
+        ]
+        clips = [
+            Clip(source_id=source.id, start_seconds=i * 10,
+                 end_seconds=(i + 1) * 10, editorial_status=status,
+                 processing_started_at=stamp)
+            for i, (status, stamp) in enumerate(cases)
+        ]
+        db.session.add_all(clips)
+        db.session.commit()
+        assert summarize_processing_backlog(now=now) == {
+            "processing_total": 4,
+            "stale_candidates": 2,
+            "untracked_candidates": 1,
+            "recent_or_active": 1,
+        }
+        assert not db.session.dirty
+        db.session.expire_all()
+        assert [db.session.get(Clip, c.id).editorial_status for c in clips] == [
+            case[0] for case in cases
+        ]
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"older_than": timedelta(0)},
+    {"older_than": timedelta(seconds=-1)},
+    {"older_than": 1},
+    {"now": datetime(2026, 11, 23)},
+    {"now": "2026-11-23"},
+])
+def test_backlog_summary_rejects_invalid_inputs(recovery_app, kwargs):
+    from app.services.processing_recovery import summarize_processing_backlog
+
+    with recovery_app.app_context(), pytest.raises(ValueError):
+        summarize_processing_backlog(**kwargs)

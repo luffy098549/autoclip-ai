@@ -25,7 +25,10 @@ def test_postgres_migrated_schema_and_foreign_keys():
         }.issubset(set(inspector.get_table_names()))
         assert db.session.execute(
             text("SELECT version_num FROM alembic_version")
-        ).scalar_one()=="20261109_002"
+        ).scalar_one()=="20261122_003"
+        assert "processing_started_at" in {
+            column["name"] for column in inspector.get_columns("clips")
+        }
 
 
 def test_postgres_transaction_roundtrip():

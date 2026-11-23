@@ -100,3 +100,53 @@ def test_invalid_clip_interval_does_not_claim_or_render(monkeypatch, tmp_path, s
         finally:
             db.session.remove()
             db.drop_all()
+
+
+@pytest.mark.parametrize("write_empty", [False, True])
+def test_renderer_must_produce_nonempty_artifact(monkeypatch, tmp_path, write_empty):
+    app = create_app({
+        "TESTING": True,
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "MEDIA_ROOT": str(tmp_path),
+    })
+    with app.app_context():
+        db.create_all()
+        try:
+            source = MediaSource(
+                source_uri="owned.mp4", rights_status="owned",
+                permission_evidence="original recording owned by operator",
+            )
+            db.session.add(source)
+            db.session.flush()
+            clip = Clip(source_id=source.id, start_seconds=0, end_seconds=10,
+                        editorial_status="awaiting_worker")
+            db.session.add(clip)
+            db.session.commit()
+            clip_id = clip.id
+
+            def missing_or_empty_artifact(source_uri, destination, start, end, authorized):
+                if write_empty:
+                    Path(destination).parent.mkdir(parents=True, exist_ok=True)
+                    Path(destination).write_bytes(b"")
+                return {"path": str(destination)}
+
+            def must_not_export(*args, **kwargs):
+                pytest.fail("Subtitle export ran for a missing or empty render")
+
+            monkeypatch.setattr(
+                "app.services.clip_processor.create_local_clip", missing_or_empty_artifact
+            )
+            monkeypatch.setattr(
+                "app.services.subtitle_export.export_clip_srt", must_not_export
+            )
+            with pytest.raises(ValueError, match="nonempty clip artifact"):
+                process_clip(clip_id)
+            db.session.expire_all()
+            saved = db.session.get(Clip, clip_id)
+            assert saved.editorial_status == "failed"
+            assert saved.processing_started_at is None
+            assert saved.output_path is None
+            assert not (tmp_path / "clips" / f"clip-{clip_id}.mp4").exists()
+        finally:
+            db.session.remove()
+            db.drop_all()

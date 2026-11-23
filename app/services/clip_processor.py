@@ -72,6 +72,10 @@ def process_clip(clip_id: int):
         if subtitle_path and current_app.config.get("AUTO_CAPTION_ENABLED"):
             from .caption_burn import burn_subtitles
             burn_subtitles(info["path"], subtitle_path, captioned)
+            # Caption encoders may return successfully without writing playable media.
+            # Never expose a missing/empty captioned file as a ready clip.
+            if not captioned.is_file() or captioned.stat().st_size == 0:
+                raise ValueError("Caption renderer did not produce a nonempty clip artifact")
             clip.output_path = str(captioned)
             info["captioned_path"] = str(captioned)
             # Return the same playable artifact that the database exposes.

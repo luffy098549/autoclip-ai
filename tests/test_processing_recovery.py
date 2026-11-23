@@ -120,7 +120,8 @@ def test_backlog_summary_counts_all_categories_without_writes(recovery_app):
             "processing_total": 4,
             "stale_candidates": 2,
             "untracked_candidates": 1,
-            "recent_or_active": 1,\n            "future_clock_skew_candidates": 0,
+            "recent_or_active": 1,
+            "future_clock_skew_candidates": 0,
         }
         assert not db.session.dirty
         db.session.expire_all()
@@ -132,7 +133,10 @@ def test_backlog_summary_counts_all_categories_without_writes(recovery_app):
 @pytest.mark.parametrize("kwargs", [
     {"older_than": timedelta(0)},
     {"older_than": timedelta(seconds=-1)},
-    {"older_than": 1},\n    {"future_tolerance": -1},\n    {"future_tolerance": timedelta(seconds=-1)},\n    {"future_tolerance": True},
+    {"older_than": 1},
+    {"future_tolerance": -1},
+    {"future_tolerance": timedelta(seconds=-1)},
+    {"future_tolerance": True},
     {"now": datetime(2026, 11, 23)},
     {"now": "2026-11-23"},
 ])

@@ -55,25 +55,31 @@ def find_untracked_processing_clips(*, limit=100):
 
 def summarize_processing_backlog(*, now=None, older_than=timedelta(hours=2),
                                  future_tolerance=timedelta(minutes=5)):
-    """Read-only counts for operator dashboards; never claim a worker is dead.
-
-    Counts are deliberately independent of paginated candidate lists, so an
-    operator can see the full backlog even when only 100 IDs are displayed.
-    """
+    """Read-only counts of stale, untracked, recent, and future-skewed claims."""
     if type(older_than) is not timedelta or older_than <= timedelta(0):
         raise ValueError("older_than must be a positive timedelta")
+    if type(future_tolerance) is not timedelta or future_tolerance < timedelta(0):
+        raise ValueError("future_tolerance must be a nonnegative timedelta")
     if now is None:
         now = datetime.now(timezone.utc)
     if not isinstance(now, datetime) or now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("now must be timezone-aware")
-    cutoff = now.astimezone(timezone.utc) - older_than
+    utc_now = now.astimezone(timezone.utc)
+    cutoff = utc_now - older_than
+    future_cutoff = utc_now + future_tolerance
     base = db.session.query(Clip.id).filter(Clip.editorial_status == "processing")
     tracked = base.filter(Clip.processing_started_at.isnot(None))
     return {
         "processing_total": base.count(),
         "stale_candidates": tracked.filter(Clip.processing_started_at <= cutoff).count(),
         "untracked_candidates": base.filter(Clip.processing_started_at.is_(None)).count(),
-        "recent_or_active": tracked.filter(\n            Clip.processing_started_at > cutoff,\n            Clip.processing_started_at <= future_cutoff,\n        ).count(),\n        "future_clock_skew_candidates": tracked.filter(\n            Clip.processing_started_at > future_cutoff\n        ).count(),
+        "recent_or_active": tracked.filter(
+            Clip.processing_started_at > cutoff,
+            Clip.processing_started_at <= future_cutoff,
+        ).count(),
+        "future_clock_skew_candidates": tracked.filter(
+            Clip.processing_started_at > future_cutoff
+        ).count(),
     }
 
 

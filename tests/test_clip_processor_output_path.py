@@ -54,6 +54,7 @@ def test_renderer_cannot_replace_clip_path_with_unrelated_file(monkeypatch, tmp_
             saved = db.session.get(Clip, clip_id)
             assert saved.editorial_status == "failed"
             assert saved.output_path is None
+            assert saved.processing_started_at is None
             assert unrelated.read_bytes() == b"must remain intact"
             assert not (tmp_path / "clips" / f"clip-{clip_id}.mp4").exists()
         finally:

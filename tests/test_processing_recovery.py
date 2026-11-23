@@ -5,7 +5,7 @@ import pytest
 
 from app import create_app
 from app.models import Clip, MediaSource, db
-from app.services.processing_recovery import find_stale_processing_clips
+from app.services.processing_recovery import find_stale_processing_clips, find_untracked_processing_clips
 
 
 @pytest.fixture
@@ -60,3 +60,34 @@ def test_only_old_processing_clips_are_reported_without_mutation(recovery_app):
 def test_invalid_scan_inputs_are_rejected(recovery_app, kwargs):
     with recovery_app.app_context(), pytest.raises(ValueError):
         find_stale_processing_clips(**kwargs)
+
+
+def test_untracked_processing_clips_are_reported_read_only(recovery_app):
+    with recovery_app.app_context():
+        source = MediaSource(source_uri="owned.mp4", rights_status="owned")
+        db.session.add(source)
+        db.session.flush()
+        rows = [
+            Clip(source_id=source.id, start_seconds=0, end_seconds=10,
+                 editorial_status=status, processing_started_at=stamp)
+            for status, stamp in [
+                ("processing", None),
+                ("ready", None),
+                ("processing", datetime(2026, 11, 22, tzinfo=timezone.utc)),
+                ("processing", None),
+            ]
+        ]
+        db.session.add_all(rows)
+        db.session.commit()
+        assert find_untracked_processing_clips(limit=1) == [rows[0].id]
+        assert find_untracked_processing_clips() == [rows[0].id, rows[3].id]
+        db.session.expire_all()
+        assert [db.session.get(Clip, row.id).editorial_status for row in rows] == [
+            "processing", "ready", "processing", "processing"
+        ]
+
+
+@pytest.mark.parametrize("limit", [0, -1, True, 1.5, "10", 1001])
+def test_untracked_scan_rejects_invalid_limits(recovery_app, limit):
+    with recovery_app.app_context(), pytest.raises(ValueError):
+        find_untracked_processing_clips(limit=limit)

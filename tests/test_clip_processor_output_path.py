@@ -60,3 +60,44 @@ def test_renderer_cannot_replace_clip_path_with_unrelated_file(monkeypatch, tmp_
         finally:
             db.session.remove()
             db.drop_all()
+
+
+@pytest.mark.parametrize("start,end", [
+    (-1, 10), (10, 10), (11, 10),
+    (float("nan"), 10), (0, float("inf")),
+    (float("-inf"), 10), (0, float("nan")),
+])
+def test_invalid_clip_interval_does_not_claim_or_render(monkeypatch, tmp_path, start, end):
+    app = create_app({
+        "TESTING": True,
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "MEDIA_ROOT": str(tmp_path),
+    })
+    with app.app_context():
+        db.create_all()
+        try:
+            source = MediaSource(source_uri="owned.mp4", rights_status="owned",
+                                 permission_evidence="original recording")
+            db.session.add(source)
+            db.session.flush()
+            clip = Clip(source_id=source.id, start_seconds=start, end_seconds=end,
+                        editorial_status="awaiting_worker")
+            db.session.add(clip)
+            db.session.commit()
+            clip_id = clip.id
+
+            def must_not_render(*args, **kwargs):
+                pytest.fail("Invalid interval reached the renderer")
+
+            monkeypatch.setattr("app.services.clip_processor.create_local_clip",
+                                must_not_render)
+            with pytest.raises(ValueError, match="Invalid clip start/end times"):
+                process_clip(clip_id)
+            db.session.expire_all()
+            saved = db.session.get(Clip, clip_id)
+            assert saved.editorial_status == "awaiting_worker"
+            assert saved.processing_started_at is None
+            assert saved.output_path is None
+        finally:
+            db.session.remove()
+            db.drop_all()

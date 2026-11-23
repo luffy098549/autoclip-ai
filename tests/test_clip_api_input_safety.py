@@ -317,7 +317,10 @@ def test_render_does_not_mark_ready_if_rights_revoked_during_encoding(portal, mo
                 source.rights_status = "unverified"
                 source.permission_evidence = ""
                 other.commit()
-            return {"path": str(root / "clips" / f"clip-{clip_id}.mp4")}
+            target = root / "clips" / f"clip-{clip_id}.mp4"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(b"synthetic rendered media")
+            return {"path": str(target)}
 
         monkeypatch.setattr("app.services.clip_processor.create_local_clip",
                             revoke_during_encoding)
@@ -341,8 +344,14 @@ def test_render_marks_ready_when_rights_remain_valid(portal, monkeypatch):
         db.session.commit()
         clip_id = clip.id
         target = str(root / "clips" / f"clip-{clip_id}.mp4")
+        def render_owned_clip(*args, **kwargs):
+            destination = Path(target)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(b"synthetic rendered media")
+            return {"path": target}
+
         monkeypatch.setattr("app.services.clip_processor.create_local_clip",
-                            lambda *args, **kwargs: {"path": target})
+                            render_owned_clip)
         monkeypatch.setattr("app.services.subtitle_export.export_clip_srt",
                             lambda *args, **kwargs: None)
         from app.services.clip_processor import process_clip

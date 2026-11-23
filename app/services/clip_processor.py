@@ -1,5 +1,6 @@
 """Worker-safe clip processing. Requires prior source authorization."""
 from pathlib import Path
+from datetime import datetime, timezone
 from flask import current_app
 from ..models import db, Clip, MediaSource
 from .rights import assess_rights
@@ -29,7 +30,7 @@ def process_clip(clip_id: int):
     claimed = db.session.query(Clip).filter(
         Clip.id == clip_id,
         Clip.editorial_status.in_(("draft", "failed", "awaiting_worker", "queued")),
-    ).update({Clip.editorial_status: "processing"}, synchronize_session=False)
+    ).update({Clip.editorial_status: "processing", Clip.processing_started_at: datetime.now(timezone.utc)}, synchronize_session=False)
     db.session.commit()
     if claimed != 1:
         raise ClipNotEligibleError("Clip already processing or not eligible for rendering")
@@ -72,6 +73,7 @@ def process_clip(clip_id: int):
         if not assess_rights(source.rights_status, source.permission_evidence).allowed:
             raise SourceAuthorizationRevoked("Source authorization revoked during rendering")
         clip.editorial_status = "ready"
+        clip.processing_started_at = None
         db.session.commit()
         return info
     except Exception as error:
@@ -87,6 +89,7 @@ def process_clip(clip_id: int):
         clip = db.session.get(Clip, clip_id)
         # A failed retry must never retain a previously rendered download path.
         clip.output_path = None
+        clip.processing_started_at = None
         # Revocation is an authorization decision, not an encoder failure.
         # Keep the clip rejected so recovery jobs cannot retry it as a
         # transient failure without a fresh rights review.

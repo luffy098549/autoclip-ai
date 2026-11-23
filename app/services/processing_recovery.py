@@ -51,3 +51,26 @@ def find_untracked_processing_clips(*, limit=100):
         .all()
     )
     return [row[0] for row in rows]
+
+
+def summarize_processing_backlog(*, now=None, older_than=timedelta(hours=2)):
+    """Read-only counts for operator dashboards; never claim a worker is dead.
+
+    Counts are deliberately independent of paginated candidate lists, so an
+    operator can see the full backlog even when only 100 IDs are displayed.
+    """
+    if type(older_than) is not timedelta or older_than <= timedelta(0):
+        raise ValueError("older_than must be a positive timedelta")
+    if now is None:
+        now = datetime.now(timezone.utc)
+    if not isinstance(now, datetime) or now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("now must be timezone-aware")
+    cutoff = now.astimezone(timezone.utc) - older_than
+    base = db.session.query(Clip.id).filter(Clip.editorial_status == "processing")
+    tracked = base.filter(Clip.processing_started_at.isnot(None))
+    return {
+        "processing_total": base.count(),
+        "stale_candidates": tracked.filter(Clip.processing_started_at <= cutoff).count(),
+        "untracked_candidates": base.filter(Clip.processing_started_at.is_(None)).count(),
+        "recent_or_active": tracked.filter(Clip.processing_started_at > cutoff).count(),
+    }

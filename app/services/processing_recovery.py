@@ -74,3 +74,24 @@ def summarize_processing_backlog(*, now=None, older_than=timedelta(hours=2)):
         "untracked_candidates": base.filter(Clip.processing_started_at.is_(None)).count(),
         "recent_or_active": tracked.filter(Clip.processing_started_at > cutoff).count(),
     }
+
+
+def find_future_processing_clips(*, now=None, tolerance=timedelta(minutes=5), limit=100):
+    """Find clock-skewed processing timestamps for manual inspection only."""
+    if type(tolerance) is not timedelta or tolerance < timedelta(0):
+        raise ValueError("tolerance must be a nonnegative timedelta")
+    if type(limit) is not int or not 1 <= limit <= 1000:
+        raise ValueError("limit must be between 1 and 1000")
+    if now is None:
+        now = datetime.now(timezone.utc)
+    if not isinstance(now, datetime) or now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("now must be timezone-aware")
+    cutoff = now.astimezone(timezone.utc) + tolerance
+    rows = (
+        db.session.query(Clip.id)
+        .filter(Clip.editorial_status == "processing", Clip.processing_started_at > cutoff)
+        .order_by(Clip.processing_started_at.desc(), Clip.id.asc())
+        .limit(limit)
+        .all()
+    )
+    return [row[0] for row in rows]

@@ -269,3 +269,66 @@ def test_renderer_symlink_cannot_expose_external_media(monkeypatch, tmp_path, ca
         finally:
             db.session.remove()
             db.drop_all()
+
+
+@pytest.mark.parametrize("captioned_output", [False, True])
+def test_renderer_hardlink_cannot_expose_external_media(monkeypatch, tmp_path, captioned_output):
+    import os
+
+    app = create_app({
+        "TESTING": True,
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "MEDIA_ROOT": str(tmp_path),
+        "AUTO_CAPTION_ENABLED": captioned_output,
+    })
+    with app.app_context():
+        db.create_all()
+        try:
+            source = MediaSource(source_uri="owned.mp4", rights_status="owned",
+                                 permission_evidence="original recording owned by operator")
+            db.session.add(source)
+            db.session.flush()
+            clip = Clip(source_id=source.id, start_seconds=0, end_seconds=10,
+                        editorial_status="awaiting_worker")
+            db.session.add(clip)
+            db.session.commit()
+            clip_id = clip.id
+            external = tmp_path / "external-hardlink.mp4"
+            external.write_bytes(b"private original must remain untouched")
+
+            def render(source_uri, destination, start, end, authorized):
+                destination = Path(destination)
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                if captioned_output:
+                    destination.write_bytes(b"synthetic owned clip")
+                else:
+                    os.link(external, destination)
+                return {"path": str(destination)}
+
+            def export_srt(clip_id, destination):
+                destination = Path(destination)
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text("1\\n00:00:00,000 --> 00:00:01,000\\nTest\\n")
+                return str(destination)
+
+            def burn(source_path, subtitle_path, destination):
+                os.link(external, destination)
+                return str(destination)
+
+            monkeypatch.setattr("app.services.clip_processor.create_local_clip", render)
+            monkeypatch.setattr("app.services.subtitle_export.export_clip_srt", export_srt)
+            monkeypatch.setattr("app.services.caption_burn.burn_subtitles", burn)
+            with pytest.raises(ValueError, match="nonempty .*artifact"):
+                process_clip(clip_id)
+            db.session.expire_all()
+            saved = db.session.get(Clip, clip_id)
+            assert saved.editorial_status == "failed"
+            assert saved.output_path is None
+            assert saved.processing_started_at is None
+            assert external.read_bytes() == b"private original must remain untouched"
+            assert external.stat().st_nlink == 1
+            assert not (tmp_path / "clips" / f"clip-{clip_id}.mp4").exists()
+            assert not (tmp_path / "clips" / f"clip-{clip_id}-captioned.mp4").exists()
+        finally:
+            db.session.remove()
+            db.drop_all()

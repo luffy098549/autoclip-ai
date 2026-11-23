@@ -53,7 +53,8 @@ def find_untracked_processing_clips(*, limit=100):
     return [row[0] for row in rows]
 
 
-def summarize_processing_backlog(*, now=None, older_than=timedelta(hours=2)):
+def summarize_processing_backlog(*, now=None, older_than=timedelta(hours=2),
+                                 future_tolerance=timedelta(minutes=5)):
     """Read-only counts for operator dashboards; never claim a worker is dead.
 
     Counts are deliberately independent of paginated candidate lists, so an
@@ -72,7 +73,7 @@ def summarize_processing_backlog(*, now=None, older_than=timedelta(hours=2)):
         "processing_total": base.count(),
         "stale_candidates": tracked.filter(Clip.processing_started_at <= cutoff).count(),
         "untracked_candidates": base.filter(Clip.processing_started_at.is_(None)).count(),
-        "recent_or_active": tracked.filter(Clip.processing_started_at > cutoff).count(),
+        "recent_or_active": tracked.filter(\n            Clip.processing_started_at > cutoff,\n            Clip.processing_started_at <= future_cutoff,\n        ).count(),\n        "future_clock_skew_candidates": tracked.filter(\n            Clip.processing_started_at > future_cutoff\n        ).count(),
     }
 
 

@@ -141,3 +141,49 @@ def test_backlog_summary_rejects_invalid_inputs(recovery_app, kwargs):
 
     with recovery_app.app_context(), pytest.raises(ValueError):
         summarize_processing_backlog(**kwargs)
+
+
+def test_future_processing_claims_are_diagnostic_only(recovery_app):
+    from app.services.processing_recovery import find_future_processing_clips
+
+    now = datetime(2026, 11, 23, 12, tzinfo=timezone.utc)
+    with recovery_app.app_context():
+        source = MediaSource(source_uri="owned-clock-skew.mp4", rights_status="owned")
+        db.session.add(source)
+        db.session.flush()
+        cases = [
+            ("processing", now + timedelta(hours=2)),
+            ("processing", now + timedelta(minutes=6)),
+            ("processing", now + timedelta(minutes=5)),
+            ("processing", now - timedelta(minutes=1)),
+            ("ready", now + timedelta(days=1)),
+        ]
+        clips = [Clip(source_id=source.id, start_seconds=i * 10,
+                      end_seconds=(i + 1) * 10, editorial_status=status,
+                      processing_started_at=stamp)
+                 for i, (status, stamp) in enumerate(cases)]
+        db.session.add_all(clips)
+        db.session.commit()
+        assert find_future_processing_clips(now=now) == [clips[0].id, clips[1].id]
+        assert find_future_processing_clips(now=now, limit=1) == [clips[0].id]
+        assert not db.session.dirty
+        db.session.expire_all()
+        assert [db.session.get(Clip, clip.id).editorial_status for clip in clips] == [
+            status for status, _ in cases
+        ]
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"tolerance": timedelta(seconds=-1)},
+    {"tolerance": 300},
+    {"limit": 0},
+    {"limit": True},
+    {"limit": 1001},
+    {"now": datetime(2026, 11, 23)},
+    {"now": "2026-11-23"},
+])
+def test_future_processing_scan_rejects_invalid_inputs(recovery_app, kwargs):
+    from app.services.processing_recovery import find_future_processing_clips
+
+    with recovery_app.app_context(), pytest.raises(ValueError):
+        find_future_processing_clips(**kwargs)

@@ -62,6 +62,9 @@ def process_clip(clip_id: int):
         rendered_path = Path(info["path"]).resolve()
         if rendered_path != target.resolve():
             raise ValueError("Renderer returned an unexpected output path")
+        # Never mark a clip ready when an encoder claims success without an artifact.
+        if not target.is_file() or target.stat().st_size == 0:
+            raise ValueError("Renderer did not produce a nonempty clip artifact")
         from .subtitle_export import export_clip_srt
         subtitle_path = export_clip_srt(clip.id, subtitles)
         clip.output_path = str(target)

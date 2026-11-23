@@ -120,7 +120,7 @@ def test_backlog_summary_counts_all_categories_without_writes(recovery_app):
             "processing_total": 4,
             "stale_candidates": 2,
             "untracked_candidates": 1,
-            "recent_or_active": 1,
+            "recent_or_active": 1,\n            "future_clock_skew_candidates": 0,
         }
         assert not db.session.dirty
         db.session.expire_all()
@@ -132,7 +132,7 @@ def test_backlog_summary_counts_all_categories_without_writes(recovery_app):
 @pytest.mark.parametrize("kwargs", [
     {"older_than": timedelta(0)},
     {"older_than": timedelta(seconds=-1)},
-    {"older_than": 1},
+    {"older_than": 1},\n    {"future_tolerance": -1},\n    {"future_tolerance": timedelta(seconds=-1)},\n    {"future_tolerance": True},
     {"now": datetime(2026, 11, 23)},
     {"now": "2026-11-23"},
 ])
@@ -187,3 +187,35 @@ def test_future_processing_scan_rejects_invalid_inputs(recovery_app, kwargs):
 
     with recovery_app.app_context(), pytest.raises(ValueError):
         find_future_processing_clips(**kwargs)
+
+
+def test_backlog_summary_separates_future_clock_skew_from_active(recovery_app):
+    from app.services.processing_recovery import summarize_processing_backlog
+
+    now = datetime(2026, 11, 23, 12, tzinfo=timezone.utc)
+    with recovery_app.app_context():
+        source = MediaSource(source_uri="owned-future-summary.mp4", rights_status="owned")
+        db.session.add(source)
+        db.session.flush()
+        stamps = [now - timedelta(hours=3), now - timedelta(minutes=1),
+                  now + timedelta(minutes=5), now + timedelta(minutes=6),
+                  now + timedelta(hours=3), None]
+        clips = [Clip(source_id=source.id, start_seconds=i * 10,
+                      end_seconds=(i + 1) * 10, editorial_status="processing",
+                      processing_started_at=stamp)
+                 for i, stamp in enumerate(stamps)]
+        db.session.add_all(clips)
+        db.session.commit()
+        assert summarize_processing_backlog(now=now) == {
+            "processing_total": 6,
+            "stale_candidates": 1,
+            "untracked_candidates": 1,
+            "recent_or_active": 2,
+            "future_clock_skew_candidates": 2,
+        }
+        assert summarize_processing_backlog(now=now, future_tolerance=timedelta(hours=4))[
+            "future_clock_skew_candidates"] == 0
+        assert not db.session.dirty
+        db.session.expire_all()
+        assert all(db.session.get(Clip, clip.id).editorial_status == "processing"
+                   for clip in clips)

@@ -31,6 +31,7 @@ class Clip(db.Model):
     score = db.Column(db.Float)
     output_path = db.Column(db.Text)
     editorial_status = db.Column(db.String(30), default="draft", nullable=False)
+    processing_started_at = db.Column(db.DateTime(timezone=True), nullable=True)
 
 class Publication(db.Model):
     __tablename__ = "publications"
